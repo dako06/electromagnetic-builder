@@ -1,0 +1,4 @@
+#ifndef ELECTROMAGNET_DRIVER_
+#define ELECTROMAGNET_DRIVER_
+
+#endif
