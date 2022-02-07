@@ -1,8 +1,8 @@
 #include "jeremys_arm_driver.h"
 
 void Start_Next_Motion() {
-  while(!Serial.available());
-    Serial.read();
+  //while(!Serial.available());
+   // Serial.read();
   if (!Arm_Move_Queue.isEmpty()) {
     Serial.println("Executing move");
     Arm_Move_Command next = Arm_Move_Queue.dequeue();
@@ -36,14 +36,25 @@ void Queue_Pick_Up_Block(float block_x, float block_z) {
   theta1 = atan2(block_z,block_x);
   theta2 = block_x/cos(theta1) - L0;
   theta3 = -1*theta1;
-  base_grab_pos = Base_Rad_to_PWM(theta1);
-  LA_grab_pos = theta2 * 100;
-  end_grab_pos = End_Rad_to_PWM(theta3);
+  float base_grab_pos = Base_Rad_to_PWM(theta1);
+  float LA_grab_pos = theta2 * 100;
+  float end_grab_pos = End_Rad_to_PWM(theta3);
   Arm_Move_Command Move_2 = {base_grab_pos, {LA_grab_pos, true, 0}, end_grab_pos};
   Arm_Move_Queue.enqueue(Move_2);
   // Third move: perform upward vertical motion to return to the start position
   Arm_Move_Command Move_3 = {base_start_pos, {LA_start_pos, true, 0}, end_start_pos};  
   Arm_Move_Queue.enqueue(Move_3);
+}
+
+void Queue_Simple_Move_To_Position(float goal_x, float goal_z) {
+  float theta1 = atan2(goal_z,goal_x);
+  float theta2 = goal_x/cos(theta1) - L0;
+  float theta3 = -1*theta1;
+  int base_goal_pos = Base_Rad_to_PWM(theta1);
+  unsigned int LA_goal_pos = theta2 * 100;
+  int end_goal_pos = End_Rad_to_PWM(theta3);
+  Arm_Move_Command Move_1 = {base_goal_pos, {LA_goal_pos, false, LA_DEFAULT_VEL}, end_goal_pos};
+  Arm_Move_Queue.enqueue(Move_1);
 }
 
 void setup() {
@@ -78,19 +89,9 @@ void setup() {
 
   //LA_Reverse();
 
-  // First move: use the linear actuator to extend to the position from which
-     // vertical motion will begin
-  //Arm_Move_Command Move_1 = {1500, {3500, false, 5}, 1350};
-  // Second move: perform downward vertical motion
-  //Arm_Move_Command Move_2 = {1420, {5104, true, 0}, 1430};
-  // Third move: perform upward vertical motion to the center
-  //Arm_Move_Command Move_3 = {1500, {3500, true, 0}, 1350};  
-  // Fourth move: perform upward vertical motion
-  //Arm_Move_Command Move_4 = {1700, {5104, true, 0}, 1150}; 
-  // Fifth move: upward vertical motion to return
-  //Arm_Move_Command Move_5 = {1500, {3500, true, 0}, 1350};  
-  
-  Queue_Pick_Up_Block(250, -25);
+  Queue_Simple_Move_To_Position(240, 40);
+  Queue_Pick_Up_Block(250, 10);
+  Queue_Simple_Move_To_Position(220, 40);
 
   Arm_Move_Scheduler.addTask(T_Base_Servo);
   Arm_Move_Scheduler.addTask(T_Lin_Act);
@@ -404,6 +405,9 @@ float End_Rad_to_PWM(float radians) {
 /*********************************** High-level arm motion functions *****************************************/
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void Go_To_Home() {
+  Serial.println("Waiting for signal to return to home");
+  while(!Serial.available());
+  Serial.read();
   bool base_done = false;
   bool LA_done = false;
   bool end_done = false;

@@ -18,9 +18,6 @@ Servo Base_joint;
 #define BASE_MIN_PULSE_WIDTH 1200 // The mechanical limit is 900, but only part of the full range is used
 #define BASE_ZERO_POSITION_PULSE_WIDTH 1500
 #define BASE_MAX_PULSE_WIDTH 2100
-// Each time the servo position is changed, the new position is written to this address in the EEPROM (after being divided by 10
-  // to ensure that it fits in 8 bits) so that it can be read next time the board is powered on (Not currently used)
-#define BASE_LAST_POSITION_ADDR 0x00
 // Parameters for setting the velocity of the base servo
   // Current setting: 2.86 degrees per second
 #define BASE_WIDTH_INCREMENT 5
@@ -47,6 +44,7 @@ float base_angle_tan; // Used in calculating the velocity for the linear actuato
 #define LA_MAX_PULSE_WIDTH 1000
 #define LA_ACCEL_START_PULSE_WIDTH 625 // LA_MAX_VEL_NO_ACCEL converted to pulse width
 #define LA_MAX_VEL_NO_ACCEL 8 // The maximum velocity that the linear actuator can begin moving to from rest, in mm/s
+#define LA_DEFAULT_VEL 10
 #define L0 215
 unsigned int LA_curr_position;
 unsigned int LA_goal_position;
@@ -70,11 +68,8 @@ struct LA_Move_Command {
 Servo End_joint;
 #define END_SIGNAL_PIN 6
 #define END_MIN_PULSE_WIDTH 800 
-#define END_ZERO_POSITION_PULSE_WIDTH 1350
+#define END_ZERO_POSITION_PULSE_WIDTH 1400
 #define END_MAX_PULSE_WIDTH 2300
-// Each time the servo position is changed, the new position is written to this address in the EEPROM (after being divided by 10
-  // to ensure that it fits in 8 bits) so that it can be read next time the board is powered on
-#define END_LAST_POSITION_ADDR 0x04
 // Parameters for setting the velocity of the end servo
   // Current setting: 16 degrees per second (same as base servo)
 #define END_WIDTH_INCREMENT 5
@@ -127,5 +122,7 @@ bool end_servo_move_complete; // flag to tell if the task has completed
 /****** High-level arm motion functions ******/
 void Go_To_Home();
 void Start_Next_Motion();
+void Queue_Pick_Up_Block(float block_x, float block_z);
+void Queue_Simple_Move_To_Position(float goal_x, float goal_z);
 
 #endif 
