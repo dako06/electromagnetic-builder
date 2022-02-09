@@ -13,17 +13,14 @@ void setup()
 
   nh.subscribe(cmd_vel_sub);
 
-  // TODO init subscribers for our custom drivers
-  nh.subscribe(joint_position_sub);
-  // nh.subscribe(gripper_position_sub);
-
+  // initialize subscribers for RPR manipulator and electromagnet topic's 
+  nh.subscribe(la_position_sub);
+  nh.subscribe(servo_position_sub);
 
   nh.subscribe(sound_sub);
   nh.subscribe(motor_power_sub);
   nh.subscribe(reset_sub);
 
-
-// TODO add init of our custom publishers if needed
   nh.advertise(sensor_state_pub);  
   nh.advertise(version_info_pub);
   nh.advertise(imu_pub);
@@ -37,9 +34,9 @@ void setup()
 
   // Setting for Dynamixel motors
   motor_driver.init(NAME);
-  //TODO init driver object which was delcared in tb3 builder core config under motor delcaration
-  // arm_driver.init()
-  // em_driver.init()
+
+  // builder: intialize driver objects
+  // TODO jeremy: call initialization functions if neccesary   
 
   // Setting for IMU
   sensors.init();
@@ -68,7 +65,7 @@ void setup()
 void loop()
 {
   uint32_t t = millis();
-  unsigned long t_mue = micros();
+  unsigned long t_micros = micros();
 
   updateTime();
   updateVariable(nh.connected());
@@ -77,9 +74,10 @@ void loop()
   if ((t-tTime[0]) >= (1000 / CONTROL_MOTOR_SPEED_FREQUENCY))
   {
     updateGoalVelocity();
-
-    //TODO confirm that below line works as opposed to previous implementation below using motor timeout
     motor_driver.controlMotor(WHEEL_RADIUS, WHEEL_SEPARATION, goal_velocity);
+    tTime[0] = t;
+    
+    //TODO confirm if motor timeout is needed
     // if ((t-tTime[6]) > CONTROL_MOTOR_TIMEOUT) 
     // {
     //   motor_driver.controlMotor(WHEEL_RADIUS, WHEEL_SEPARATION, zero_velocity);
@@ -87,7 +85,6 @@ void loop()
     // else {
     //   motor_driver.controlMotor(WHEEL_RADIUS, WHEEL_SEPARATION, goal_velocity);
     // }
-    tTime[0] = t;
   }
 
   if ((t-tTime[1]) >= (1000 / CMD_VEL_PUBLISH_FREQUENCY))
@@ -125,18 +122,20 @@ void loop()
   }
 #endif
 
-  // running at 10 micros (1000000 micros = 1s)
-  if ((t_mue-tTime[6]) >= (1000000 / LINEAR_ACTUATOR_CONTROL_FREQEUNCY))
+  /* builder: statement executes at 90 ms
+      function call executes control of base and end servo of the RPR manipulator */ 
+  if ((t-tTime[6]) >= (1000 / SERVO_CONTROL_FREQEUNCY))
   {
-    // jointControl(); // TODO jeremy: add function call to acuate linear acuator every period
-    tTime[6] = t_mue;
+    servoJointControl(); // TODO jeremy: edit function call to acuate servos every period
+    tTime[6] = t;
   }
 
-  // running at 90 ms 
-  if ((t-tTime[7]) >= (1000 / SERVO_CONTROL_FREQEUNCY))
+  /* builder: running at 10 micros (1000000 micros = 1s)  
+      function call executes control of the linear actuator fo the RPR manipulator */
+  if ((t_micros-tTimeMicros[0]) >= (1000000 / LINEAR_ACTUATOR_CONTROL_FREQEUNCY))
   {
-    // TODO jeremy: add function call to acuate servos every period
-    tTime[7] = t;
+    LAJointControl(); // TODO jeremy: edit this function to control linear acuator every period
+    tTimeMicros[0] = t_micros;
   }
 
   // Send log message after ROS connection
@@ -193,21 +192,24 @@ void commandVelocityCallback(const geometry_msgs::Twist& cmd_vel_msg)
   based on our custom drivers ..... */
 
 /*******************************************************************************
-* Callback function for joint trajectory msg
+* Callback function for RPR linear actuator goal msg
 *******************************************************************************/
-void jointTrajectoryPointCallback(const std_msgs::Float64MultiArray& joint_trajectory_point_msg)
+void LAJointCallback(const std_msgs::Float64MultiArray& LA_joint_msg)
 {
   // if (is_moving == false)
   // {
   //   joint_trajectory_point = joint_trajectory_point_msg;
   //   is_moving = true;
   // }
+
+  // TODO complete call back
+  la_goal_point = LA_joint_msg;
 }
 
 /*******************************************************************************
-* Callback function for gripper position msg
+* Callback function for RPR base/end servo goal msg
 *******************************************************************************/
-void gripperPositionCallback(const std_msgs::Float64MultiArray& gripper_msg)
+void servoJointCallback(const std_msgs::Float64MultiArray& servo_msg)
 {
   // double goal_gripper_position[5] = {0.0, };
   // const double OPEN_MANIPULATOR_GRIPPER_OFFSET = -0.015f;
@@ -216,6 +218,9 @@ void gripperPositionCallback(const std_msgs::Float64MultiArray& gripper_msg)
   //   goal_gripper_position[index] = gripper_msg.data[index] / OPEN_MANIPULATOR_GRIPPER_OFFSET;
 
   // manipulator_driver.writeGripperPosition(goal_gripper_position);
+
+  // TODO complete call back
+  servo_goal_point = servo_msg;  
 }
 
 
@@ -642,18 +647,17 @@ bool calcOdometry(double diff_time)
 }
 
 /*******************************************************************************
-* Manipulator's joint control
+* RPR manipulator's joint control
 *******************************************************************************/
-//TODO this function is called in void loop above
-void jointControl(void)
+void LAJointControl(void)
 {
-  // TODO handle actual joint control here this is called in void loop every period
-  // const uint8_t POINT_SIZE = joint_cnt + 1; // Add time parameter
-  // const double JOINT_CONTROL_PERIOD = 1.0f / (double)JOINT_CONTROL_FREQEUNCY;
+  // TODO jeremy: implement linear actual joint control here, this is called in software loop each period
   
 }
 
 // TODO for reference of openmanip impl remove if not needed
+  // const uint8_t POINT_SIZE = joint_cnt + 1; // Add time parameter
+  // const double JOINT_CONTROL_PERIOD = 1.0f / (double)JOINT_CONTROL_FREQEUNCY;
 //   static uint8_t wait_for_write = 0;
 //   static uint8_t loop_cnt = 0;
 
@@ -709,6 +713,14 @@ void jointControl(void)
 //     }
 //   }
 // }
+
+void servoJointControl(void)
+{
+  /* TODO jeremy: implement base/end servo joint control here, 
+    this is called in software loop each period */
+  
+}
+
 
 /*******************************************************************************
 * Electromagnet's control

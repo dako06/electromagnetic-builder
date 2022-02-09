@@ -1,4 +1,3 @@
-
 #ifndef TB3_BUILDER_CORE_CONFIG_H_
 #define TB3_BUILDER_CORE_CONFIG_H_
 #define NOETIC_SUPPORT                  // uncomment this if writing code for ROS1 Noetic
@@ -64,22 +63,17 @@
 // #define DEBUG                            
 #define DEBUG_SERIAL                     SerialBT2
 
-
-// TODO here
-
 /**** Callback function prototypes ****/
-// standard tb3
 void commandVelocityCallback(const geometry_msgs::Twist& cmd_vel_msg);
 void soundCallback(const turtlebot3_msgs::Sound& sound_msg);
 void motorPowerCallback(const std_msgs::Bool& power_msg);
 void resetCallback(const std_msgs::Empty& reset_msg);
 
-// void jointTrajectoryPointCallback(const std_msgs::Float64MultiArray& joint_trajectory_point_msg);
-// void gripperPositionCallback(const std_msgs::Float64MultiArray& pos_msg);
-
 // builder: callback function prototypes for linear actuator and base/end servos
 void LAJointCallback(const std_msgs::Float64MultiArray& LA_joint_msg);
 void servoJointCallback(const std_msgs::Float64MultiArray& servo_msg);
+// void jointTrajectoryPointCallback(const std_msgs::Float64MultiArray& joint_trajectory_point_msg);
+// void gripperPositionCallback(const std_msgs::Float64MultiArray& pos_msg);
 
 // Function prototypes
 void publishCmdVelFromRC100Msg(void);
@@ -108,9 +102,9 @@ void initJointStates(void);
 
 bool calcOdometry(double diff_time);
 
-
-// builder: declaration of control function for LA joint called in software timer
+// builder: declaration of joint control functions called from software timer
 void LAJointControl(void); // void jointControl(void);
+void servoJointControl(void);
 
 void sendLogMsg(void);
 void waitForSerialLink(bool isConnected);
@@ -214,8 +208,9 @@ tf::TransformBroadcaster tf_broadcaster;
 /*******************************************************************************
 * SoftwareTimer of Turtlebot3
 *******************************************************************************/
-static uint32_t tTime[10]; // TODO check that tTime doesnt overflow due to micros()
-
+static uint32_t tTime[10]; 
+static unsigned long tTimeMicros[1]; // builder: store micros resolution for linear actuator
+ 
 /*******************************************************************************
 * Declaration for motor
 *******************************************************************************/

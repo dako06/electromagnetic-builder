@@ -1,5 +1,3 @@
-
-// TODO confirm that name change will not affect the rest fo the stack
 #ifndef TB3_BUILDER_H_
 #define TB3_BUILDER_H_
 
