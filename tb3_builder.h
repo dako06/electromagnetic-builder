@@ -1,10 +1,11 @@
 
+// TODO confirm that name change will not affect the rest fo the stack
 #ifndef TB3_BUILDER_H_
 #define TB3_BUILDER_H_
 
-// include our custom libraries for the project
+// TODO confirm proper header names from custom drivers
 #include "electromagnet_driver.h"
-#include "RPR_driver.h"
+#include "jeremys_arm_driver.h"
 
 #define NAME                             "Waffle or Waffle Pi"
 

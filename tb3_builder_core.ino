@@ -12,10 +12,18 @@ void setup()
   nh.getHardware()->setBaud(115200);
 
   nh.subscribe(cmd_vel_sub);
+
+  // TODO init subscribers for our custom drivers
+  nh.subscribe(joint_position_sub);
+  // nh.subscribe(gripper_position_sub);
+
+
   nh.subscribe(sound_sub);
   nh.subscribe(motor_power_sub);
   nh.subscribe(reset_sub);
 
+
+// TODO add init of our custom publishers if needed
   nh.advertise(sensor_state_pub);  
   nh.advertise(version_info_pub);
   nh.advertise(imu_pub);
@@ -29,6 +37,9 @@ void setup()
 
   // Setting for Dynamixel motors
   motor_driver.init(NAME);
+  //TODO init driver object which was delcared in tb3 builder core config under motor delcaration
+  // arm_driver.init()
+  // em_driver.init()
 
   // Setting for IMU
   sensors.init();
@@ -64,13 +75,16 @@ void loop()
   if ((t-tTime[0]) >= (1000 / CONTROL_MOTOR_SPEED_FREQUENCY))
   {
     updateGoalVelocity();
-    if ((t-tTime[6]) > CONTROL_MOTOR_TIMEOUT) 
-    {
-      motor_driver.controlMotor(WHEEL_RADIUS, WHEEL_SEPARATION, zero_velocity);
-    } 
-    else {
-      motor_driver.controlMotor(WHEEL_RADIUS, WHEEL_SEPARATION, goal_velocity);
-    }
+
+    //TODO confirm that below line works as opposed to previous implementation below using motor timeout
+    motor_driver.controlMotor(WHEEL_RADIUS, WHEEL_SEPARATION, goal_velocity);
+    // if ((t-tTime[6]) > CONTROL_MOTOR_TIMEOUT) 
+    // {
+    //   motor_driver.controlMotor(WHEEL_RADIUS, WHEEL_SEPARATION, zero_velocity);
+    // } 
+    // else {
+    //   motor_driver.controlMotor(WHEEL_RADIUS, WHEEL_SEPARATION, goal_velocity);
+    // }
     tTime[0] = t;
   }
 
@@ -109,13 +123,22 @@ void loop()
   }
 #endif
 
+  // TODO confirm this agrees with our impl, this is only in openmanip stack
+  if ((t-tTime[6]) >= (1000 / JOINT_CONTROL_FREQEUNCY))
+  {
+    jointControl();
+    tTime[6] = t;
+  }
+
   // Send log message after ROS connection
   sendLogMsg();
 
   // Receive data from RC100 
-  bool clicked_state = controllers.getRCdata(goal_velocity_from_rc100);
-  if (clicked_state == true)  
-    tTime[6] = millis();
+  // TODO confirm below line works instead of original impl commented out
+  controllers.getRCdata(goal_velocity_from_rc100);
+  // bool clicked_state = controllers.getRCdata(goal_velocity_from_rc100);
+  // if (clicked_state == true)  
+  //   tTime[6] = millis();
 
   // Check push button pressed for simple test drive
   driveTest(diagnosis.getButtonPress(3000));
@@ -128,7 +151,8 @@ void loop()
   // sensors.updateSonar(t);
 
   // Start Gyro Calibration after ROS connection
-  updateGyroCali(nh.connected());
+  updateGyroCali(); // TODO confirm this works over below
+  // updateGyroCali(nh.connected());
 
   // Show LED status
   diagnosis.showLedStatus(nh.connected());
@@ -153,8 +177,41 @@ void commandVelocityCallback(const geometry_msgs::Twist& cmd_vel_msg)
 
   goal_velocity_from_cmd[LINEAR]  = constrain(goal_velocity_from_cmd[LINEAR],  MIN_LINEAR_VELOCITY, MAX_LINEAR_VELOCITY);
   goal_velocity_from_cmd[ANGULAR] = constrain(goal_velocity_from_cmd[ANGULAR], MIN_ANGULAR_VELOCITY, MAX_ANGULAR_VELOCITY);
-  tTime[6] = millis();
+  // tTime[6] = millis(); TODO confirm this is okay being commented out
 }
+
+/* TODO confirm these callback fucntion definitions are properly set 
+  based on our custom drivers ..... */
+
+/*******************************************************************************
+* Callback function for joint trajectory msg
+*******************************************************************************/
+void jointTrajectoryPointCallback(const std_msgs::Float64MultiArray& joint_trajectory_point_msg)
+{
+  // if (is_moving == false)
+  // {
+  //   joint_trajectory_point = joint_trajectory_point_msg;
+  //   is_moving = true;
+  // }
+}
+
+/*******************************************************************************
+* Callback function for gripper position msg
+*******************************************************************************/
+void gripperPositionCallback(const std_msgs::Float64MultiArray& gripper_msg)
+{
+  // double goal_gripper_position[5] = {0.0, };
+  // const double OPEN_MANIPULATOR_GRIPPER_OFFSET = -0.015f;
+
+  // for (int index = 0; index < gripper_cnt; index++)
+  //   goal_gripper_position[index] = gripper_msg.data[index] / OPEN_MANIPULATOR_GRIPPER_OFFSET;
+
+  // manipulator_driver.writeGripperPosition(goal_gripper_position);
+}
+
+
+// .... continue
+
 
 /*******************************************************************************
 * Callback function for sound msg
@@ -172,6 +229,7 @@ void motorPowerCallback(const std_msgs::Bool& power_msg)
   bool dxl_power = power_msg.data;
 
   motor_driver.setTorque(dxl_power);
+  //manipulator_driver.setTorque(dxl_power); TODO confirm this isnt needed
 }
 
 /*******************************************************************************
@@ -422,6 +480,44 @@ void updateJointStates(void)
 
   joint_states.position = joint_states_pos;
   joint_states.velocity = joint_states_vel;
+
+  // TODO confirm if the below code is needed or supported based on our drivers
+  // static float joint_states_pos[20] = {0.0, };
+  // static float joint_states_vel[20] = {0.0, };
+  // static float joint_states_eff[20] = {0.0, };
+
+  // const double OPEN_MANIPULATOR_GRIPPER_OFFSET = -0.015f;
+
+  // double get_joint_position[joint_cnt + gripper_cnt];
+  // double get_joint_velocity[joint_cnt + gripper_cnt];
+  // double get_joint_current[joint_cnt + gripper_cnt];
+
+  // manipulator_driver.syncReadDynamixelInfo();
+  // manipulator_driver.getPosition(get_joint_position);
+  // manipulator_driver.getVelocity(get_joint_velocity);
+  // manipulator_driver.getCurrent(get_joint_current);
+
+  // joint_states_pos[LEFT]  = last_rad[LEFT];
+  // joint_states_pos[RIGHT] = last_rad[RIGHT];
+
+  // joint_states_vel[LEFT]  = last_velocity[LEFT];
+  // joint_states_vel[RIGHT] = last_velocity[RIGHT];
+
+  // for (uint8_t num = 0; num < (joint_cnt + gripper_cnt); num++)
+  // {
+  //   if (num >= joint_cnt)
+  //     get_joint_position[num] = get_joint_position[num] * OPEN_MANIPULATOR_GRIPPER_OFFSET;
+
+  //   joint_states_pos[WHEEL_NUM + num] = get_joint_position[num];
+  //   joint_states_vel[WHEEL_NUM + num] = get_joint_velocity[num];
+  //   joint_states_eff[WHEEL_NUM + num] = get_joint_current[num];
+  // }
+
+  // joint_states.position = joint_states_pos;
+  // joint_states.velocity = joint_states_vel;
+  // joint_states.effort = joint_states_eff;
+
+
 }
 
 /*******************************************************************************
@@ -537,6 +633,81 @@ bool calcOdometry(double diff_time)
 }
 
 /*******************************************************************************
+* Manipulator's joint control
+*******************************************************************************/
+//TODO this function is called in void loop above
+void jointControl(void)
+{
+  // TODO handle actual joint control here this is called in void loop every period
+  // const uint8_t POINT_SIZE = joint_cnt + 1; // Add time parameter
+  // const double JOINT_CONTROL_PERIOD = 1.0f / (double)JOINT_CONTROL_FREQEUNCY;
+  
+}
+
+// TODO for reference of openmanip impl remove if not needed
+//   static uint8_t wait_for_write = 0;
+//   static uint8_t loop_cnt = 0;
+
+//   if (is_moving == true)
+//   {
+//     uint32_t all_points_cnt = joint_trajectory_point.data_length;
+//     uint8_t write_cnt = 0;
+
+//     if (loop_cnt < (wait_for_write))
+//     {
+//       loop_cnt++;
+//       return;
+//     }
+//     else
+//     {
+//       double goal_joint_position[joint_cnt];
+//       double move_time = 0.0f;
+
+//       if (points == 0) move_time = joint_trajectory_point.data[points + POINT_SIZE] - joint_trajectory_point.data[points];
+//       else if ((points + POINT_SIZE) >= all_points_cnt) move_time = joint_trajectory_point.data[points] / 2.0f;
+//       else  move_time = joint_trajectory_point.data[points] - joint_trajectory_point.data[points - POINT_SIZE];
+
+//       for (uint32_t positions = points + 1; positions < (points + POINT_SIZE); positions++)
+//       {        
+//         if ((points + POINT_SIZE) >= all_points_cnt)
+//         {
+//           goal_joint_position[write_cnt] = joint_trajectory_point.data[positions];
+//         }
+//         else
+//         {
+//           double offset = 2.0f * (joint_trajectory_point.data[positions + POINT_SIZE] - joint_trajectory_point.data[positions]);
+//           goal_joint_position[write_cnt] = joint_trajectory_point.data[positions] + offset;
+//         }
+//         write_cnt++;
+//       }
+
+//       manipulator_driver.writeJointProfileControlParam(move_time * 2.0f);
+//       manipulator_driver.writeJointPosition(goal_joint_position);
+
+//       wait_for_write = move_time / JOINT_CONTROL_PERIOD;
+//       points = points + POINT_SIZE;
+
+//       if (points >= all_points_cnt)
+//       {
+//         points = 0;
+//         wait_for_write = 0;
+//         is_moving = false;
+//       }
+//       else
+//       {
+//         loop_cnt = 0;
+//       }
+//     }
+//   }
+// }
+
+/*******************************************************************************
+* Electromagnet's control
+*******************************************************************************/
+// TODO electromagnet control function here
+
+
+/*******************************************************************************
 * Turtlebot3 test drive using push buttons
 *******************************************************************************/
 void driveTest(uint8_t buttons)
@@ -555,7 +726,7 @@ void driveTest(uint8_t buttons)
     saved_tick[RIGHT] = current_tick[RIGHT];
 
     diff_encoder = TEST_DISTANCE / (0.207 / 4096); // (Circumference of Wheel) / (The number of tick per revolution)
-    tTime[6] = millis();
+    // tTime[6] = millis(); // TODO not in openmanip, arm takes this index
   }
   else if (buttons & (1<<1))
   {
@@ -563,7 +734,7 @@ void driveTest(uint8_t buttons)
     saved_tick[RIGHT] = current_tick[RIGHT];
 
     diff_encoder = (TEST_RADIAN * TURNING_RADIUS) / (0.207 / 4096);
-    tTime[6] = millis();
+    // tTime[6] = millis(); TODO similar to a couple lines up
   }
 
   if (move[LINEAR])
@@ -571,7 +742,7 @@ void driveTest(uint8_t buttons)
     if (abs(saved_tick[RIGHT] - current_tick[RIGHT]) <= diff_encoder)
     {
       goal_velocity_from_button[LINEAR]  = 0.05;
-      tTime[6] = millis();
+      // tTime[6] = millis(); TODO arm uses this index
     }
     else
     {
@@ -584,7 +755,7 @@ void driveTest(uint8_t buttons)
     if (abs(saved_tick[RIGHT] - current_tick[RIGHT]) <= diff_encoder)
     {
       goal_velocity_from_button[ANGULAR]= -0.7;
-      tTime[6] = millis();
+      // tTime[6] = millis();
     }
     else
     {
@@ -672,12 +843,13 @@ ros::Time addMicros(ros::Time & t, uint32_t _micros)
 /*******************************************************************************
 * Start Gyro Calibration
 *******************************************************************************/
-void updateGyroCali(bool isConnected)
+// void updateGyroCali(bool isConnected) // TODO this is used normal core below is for openmanip
+void updateGyroCali(void)
 {
   static bool isEnded = false;
   char log_msg[50];
 
-  (void)(isConnected);
+  // (void)(isConnected); TODO not in openmanip
 
   if (nh.connected())
   {
@@ -708,10 +880,14 @@ void sendLogMsg(void)
   static bool log_flag = false;
   char log_msg[100];  
 
-  String name             = NAME;
+  // TODO delete if okay
+  // String name             = NAME;
+  // String firmware_version = FIRMWARE_VER;
+  // String bringup_log      = "This core(v" + firmware_version + ") is compatible with TB3 " + name;
+
   String firmware_version = FIRMWARE_VER;
-  String bringup_log      = "This core(v" + firmware_version + ") is compatible with TB3 " + name;
-   
+  String bringup_log = "This core(v" + firmware_version + ") is compatible with TB3 electromagnetic-builder";
+
   const char* init_log_data = bringup_log.c_str();
 
   if (nh.connected())
@@ -724,8 +900,9 @@ void sendLogMsg(void)
       sprintf(log_msg, "Connected to OpenCR board!");
       nh.loginfo(log_msg);
 
-      sprintf(log_msg, init_log_data);
-      nh.loginfo(log_msg);
+      // TODO commented out in openmanip
+      // sprintf(log_msg, init_log_data);
+      // nh.loginfo(log_msg);
 
       sprintf(log_msg, "--------------------------");
       nh.loginfo(log_msg);
@@ -771,6 +948,8 @@ void initOdom(void)
 void initJointStates(void)
 {
   static char *joint_states_name[] = {(char*)"wheel_left_joint", (char*)"wheel_right_joint"};
+  // TODO adjus this if our arm joints are included in joint statess
+  // static char *joint_states_name[] = {"wheel_left_joint", "wheel_right_joint", "joint1", "joint2", "joint3", "joint4", "gripper"};
 
   joint_states.header.frame_id = joint_state_header_frame_id;
   joint_states.name            = joint_states_name;
@@ -779,6 +958,12 @@ void initJointStates(void)
   joint_states.position_length = WHEEL_NUM;
   joint_states.velocity_length = WHEEL_NUM;
   joint_states.effort_length   = WHEEL_NUM;
+
+  // TODO adjust to some variation fo this if we include the joints form the arm
+  // joint_states.name_length = WHEEL_NUM + joint_cnt + gripper_cnt;
+  // joint_states.position_length = WHEEL_NUM + joint_cnt + gripper_cnt;
+  // joint_states.velocity_length = WHEEL_NUM + joint_cnt + gripper_cnt;
+  // joint_states.effort_length   = WHEEL_NUM + joint_cnt + gripper_cnt;
 }
 
 /*******************************************************************************
@@ -789,8 +974,18 @@ void updateGoalVelocity(void)
   goal_velocity[LINEAR]  = goal_velocity_from_button[LINEAR]  + goal_velocity_from_cmd[LINEAR]  + goal_velocity_from_rc100[LINEAR];
   goal_velocity[ANGULAR] = goal_velocity_from_button[ANGULAR] + goal_velocity_from_cmd[ANGULAR] + goal_velocity_from_rc100[ANGULAR];
 
+  // TODO not in openmanip check if needed
   sensors.setLedPattern(goal_velocity[LINEAR], goal_velocity[ANGULAR]);
 }
+
+/*******************************************************************************
+* map (return double)
+*******************************************************************************/
+// TODO used in openmanip
+// double mapd(double x, double in_min, double in_max, double out_min, double out_max)
+// {
+//   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+// }
 
 /*******************************************************************************
 * Send Debug data
@@ -823,6 +1018,17 @@ void sendDebuglog(void)
   DEBUG_SERIAL.println("DYNAMIXELS");
   DEBUG_SERIAL.println("---------------------------------------");
   DEBUG_SERIAL.println("Torque : " + String(motor_driver.getTorque()));
+
+  // DEBUG_SERIAL.println("---------------------------------------");
+  // DEBUG_SERIAL.println("Electromagnet");
+  // DEBUG_SERIAL.println("---------------------------------------");
+  // TODO add state update
+
+  // DEBUG_SERIAL.println("---------------------------------------");
+  // DEBUG_SERIAL.println("");
+  // DEBUG_SERIAL.println("---------------------------------------");
+  // DEBUG_SERIAL.println("Torque(joint) : " + String());
+
 
   int32_t encoder[WHEEL_NUM] = {0, 0};
   motor_driver.readEncoder(encoder[LEFT], encoder[RIGHT]);
