@@ -96,6 +96,7 @@ void setup() {
   Arm_Move_Scheduler.addTask(T_Base_Servo);
   Arm_Move_Scheduler.addTask(T_Lin_Act);
   Arm_Move_Scheduler.addTask(T_End_Servo);
+  Arm_Move_Scheduler.addTask(T_Homing);
   Start_Next_Motion();
 }
 
@@ -166,6 +167,37 @@ float Base_Rad_to_PWM(float radians) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*********************************** Linear Actuator functions ***********************************************/
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Homing_Callback() {
+  // Keep moving the linear actuator backwards until it trips the homing switch
+  // We do not track steps here because the final position that the linear actuator
+    // ends up in will be considered the new zero position
+  if (/*Switch has been tripped*/) {
+    Serial.println("New home position reached");
+    LA_curr_position = 0; 
+    T_Homing.disable();
+    return;
+  }
+  else {
+    LA_Toggle_Step_Pin();
+  }
+}
+
+void Homing_OnDisable() {
+  LA_move_complete = 1;
+  // Return control to whatever code was being run before homing started
+}
+
+// Bring the linear actuator back until it trips the homing limit switch
+void Do_LA_Homing() {
+  Serial.println("Begin homing");
+  if (T_Base_Servo.isEnabled() || T_Lin_Act.isEnabled() || T_End_Servo.isEnabled()) {
+    Serial.println("Could not execute homing, another motion task is currently enabled");
+  }
+  LA_Retract();
+  LA_move_complete = 0;
+  T_Homing.restart();
+}
 
 void Lin_Act_Move_Callback() {
   static unsigned int steps_this_move = 0; // How many steps the linear actuator has moved on the current motion task

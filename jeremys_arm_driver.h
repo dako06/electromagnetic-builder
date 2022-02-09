@@ -111,6 +111,10 @@ float LA_Pos_mm();
 void LA_Reverse(); // Only a temporary measure for moving the linear actuator backwards when the program fails to do so
 Task T_Lin_Act(0,TASK_FOREVER,&Lin_Act_Move_Callback,&Arm_Move_Scheduler,0,NULL,&Lin_Act_OnDisable);
 bool LA_move_complete; // flag to tell if the task has completed
+void Homing_Callback();
+void Homing_OnDisable();
+void Do_LA_Homing();
+Task T_Homing(0,TASK_FOREVER,&Homing_Callback,&Arm_Move_Scheduler,0,NULL,&Homing_OnDisable);
 /****** T_End_Servo: Task which moves the base servo to its next position ******/
 void End_Servo_OnDisable();
 void End_Servo_Move_Callback();
