@@ -69,6 +69,7 @@ void setup() {
   base_servo_move_complete = 0;
   ///////////////////////////////////// Linear actuator setup
   Stepper_Driver_Setup();
+  pinMode(HOMING_SWITCH_PIN, INPUT);
   LA_Extend();
   LA_curr_position = 0;
   LA_curr_pulse_width = LA_ACCEL_START_PULSE_WIDTH;
@@ -89,15 +90,16 @@ void setup() {
 
   //LA_Reverse();
 
-  Queue_Simple_Move_To_Position(240, 40);
-  Queue_Pick_Up_Block(250, 10);
-  Queue_Simple_Move_To_Position(220, 40);
+  //Queue_Simple_Move_To_Position(240, 40);
+  //Queue_Pick_Up_Block(250, 10);
+  //Queue_Simple_Move_To_Position(220, 40);
 
   Arm_Move_Scheduler.addTask(T_Base_Servo);
   Arm_Move_Scheduler.addTask(T_Lin_Act);
   Arm_Move_Scheduler.addTask(T_End_Servo);
   Arm_Move_Scheduler.addTask(T_Homing);
-  Start_Next_Motion();
+  //Start_Next_Motion();
+  Start_LA_Homing();
 }
 
 void loop() {
@@ -172,7 +174,9 @@ void Homing_Callback() {
   // Keep moving the linear actuator backwards until it trips the homing switch
   // We do not track steps here because the final position that the linear actuator
     // ends up in will be considered the new zero position
-  if (/*Switch has been tripped*/) {
+  // When the homing switch is not pressed, the pin connected to the OpenCR is 
+    // connected to ground. When the switch is pressed, it is pulled up to 5V
+  if (digitalRead(HOMING_SWITCH_PIN)) {
     Serial.println("New home position reached");
     LA_curr_position = 0; 
     T_Homing.disable();
@@ -189,10 +193,12 @@ void Homing_OnDisable() {
 }
 
 // Bring the linear actuator back until it trips the homing limit switch
-void Do_LA_Homing() {
-  Serial.println("Begin homing");
+void Start_LA_Homing() {
   if (T_Base_Servo.isEnabled() || T_Lin_Act.isEnabled() || T_End_Servo.isEnabled()) {
     Serial.println("Could not execute homing, another motion task is currently enabled");
+  }
+  else {
+    Serial.println("Begin homing");
   }
   LA_Retract();
   LA_move_complete = 0;

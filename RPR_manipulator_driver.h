@@ -34,6 +34,7 @@ float base_angle_tan; // Used in calculating the velocity for the linear actuato
 // Stepper motor wires should be in this order (starting furthest from the capacitor): blue, red, black, green
 #define STEP_PIN 5
 #define DIR_PIN 4
+#define HOMING_SWITCH_PIN 7
 #define STEP_SIZE_MM 0.01
 #define FULL_STROKE_STEPS 10000
 // Do not allow the linear actuator to get within this many steps from its limits
@@ -113,8 +114,8 @@ Task T_Lin_Act(0,TASK_FOREVER,&Lin_Act_Move_Callback,&Arm_Move_Scheduler,0,NULL,
 bool LA_move_complete; // flag to tell if the task has completed
 void Homing_Callback();
 void Homing_OnDisable();
-void Do_LA_Homing();
-Task T_Homing(0,TASK_FOREVER,&Homing_Callback,&Arm_Move_Scheduler,0,NULL,&Homing_OnDisable);
+void Start_LA_Homing();
+Task T_Homing(LA_ACCEL_START_PULSE_WIDTH,TASK_FOREVER,&Homing_Callback,&Arm_Move_Scheduler,0,NULL,&Homing_OnDisable);
 /****** T_End_Servo: Task which moves the base servo to its next position ******/
 void End_Servo_OnDisable();
 void End_Servo_Move_Callback();
