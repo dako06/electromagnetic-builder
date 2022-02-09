@@ -23,26 +23,26 @@
 
 #include <TurtleBot3.h>
 
-// TODO include custom header for our tb3 style 
+// builder: header for custom tb3 configuration
 #include "tb3_builder.h"
 
 #include <math.h>
 
 #define FIRMWARE_VER "1.2.6"
 
-
 // TODO confirm commenting this is okay
 // #define CONTROL_MOTOR_TIMEOUT                  500  //ms
 
-// TODO update this if needed for our arm
-#define JOINT_CONTROL_FREQEUNCY                100  //hz 
+// builder: control frequency for RPR_manipulator joints
+#define LINEAR_ACTUATOR_CONTROL_FREQEUNCY      100000   //hz using micros
+#define SERVO_CONTROL_FREQEUNCY                11       //hz 
 
-#define CONTROL_MOTOR_SPEED_FREQUENCY          30   //hz
-#define IMU_PUBLISH_FREQUENCY                  200  //hz
-#define CMD_VEL_PUBLISH_FREQUENCY              30   //hz
-#define DRIVE_INFORMATION_PUBLISH_FREQUENCY    30   //hz
-#define VERSION_INFORMATION_PUBLISH_FREQUENCY  1    //hz 
-#define DEBUG_LOG_FREQUENCY                    10   //hz 
+#define CONTROL_MOTOR_SPEED_FREQUENCY          30       //hz
+#define IMU_PUBLISH_FREQUENCY                  200      //hz
+#define CMD_VEL_PUBLISH_FREQUENCY              30       //hz
+#define DRIVE_INFORMATION_PUBLISH_FREQUENCY    30       //hz
+#define VERSION_INFORMATION_PUBLISH_FREQUENCY  1        //hz 
+#define DEBUG_LOG_FREQUENCY                    10       //hz 
 
 
 #define WHEEL_NUM                        2
@@ -74,10 +74,12 @@ void soundCallback(const turtlebot3_msgs::Sound& sound_msg);
 void motorPowerCallback(const std_msgs::Bool& power_msg);
 void resetCallback(const std_msgs::Empty& reset_msg);
 
-// TODO arm and electromagnet callback function prototypes
-void jointTrajectoryPointCallback(const std_msgs::Float64MultiArray& joint_trajectory_point_msg);
-void gripperPositionCallback(const std_msgs::Float64MultiArray& pos_msg);
+// void jointTrajectoryPointCallback(const std_msgs::Float64MultiArray& joint_trajectory_point_msg);
+// void gripperPositionCallback(const std_msgs::Float64MultiArray& pos_msg);
 
+// builder: callback function prototypes for linear actuator and base/end servos
+void LAJointCallback(const std_msgs::Float64MultiArray& LA_joint_msg);
+void servoJointCallback(const std_msgs::Float64MultiArray& servo_msg);
 
 // Function prototypes
 void publishCmdVelFromRC100Msg(void);
@@ -106,8 +108,9 @@ void initJointStates(void);
 
 bool calcOdometry(double diff_time);
 
-// TODO these are from openmanip stack, confirm they are needed or useful
-void jointControl(void);
+
+// builder: declaration of control function for LA joint called in software timer
+void LAJointControl(void); // void jointControl(void);
 
 void sendLogMsg(void);
 void waitForSerialLink(bool isConnected);
@@ -148,17 +151,19 @@ ros::Subscriber<std_msgs::Bool> motor_power_sub("motor_power", motorPowerCallbac
 ros::Subscriber<std_msgs::Empty> reset_sub("reset", resetCallback);
 
 
-/* TODO subscribers for custom arm and emag dirvers, 
-    first argument is the topic name , 
-    second argument is the callback function which has a protoyped declared above in callback function protoypes section
+/* builder: subscribers for custom drivers 
+    arg1: topic name
+    arg2: callback function handle
+    TODO: rename topic names
 */  
-ros::Subscriber<std_msgs::Float64MultiArray> joint_position_sub("joint_trajectory_point", jointTrajectoryPointCallback);
+// ros::Subscriber<std_msgs::Float64MultiArray> joint_position_sub("joint_trajectory_point", jointTrajectoryPointCallback);
 // ros::Subscriber<std_msgs::Float64MultiArray> gripper_position_sub("gripper_position", gripperPositionCallback);
+ros::Subscriber<std_msgs::Float64MultiArray> la_position_sub("joint_trajectory_point", LAJointCallback);
+ros::Subscriber<std_msgs::Float64MultiArray> servo_position_sub("gripper_position", servoJointCallback);
 
 // TODO accompanying publishers
 //   joint_trajectory_point_pub_ = nh_.advertise<std_msgs::Float64MultiArray>("joint_trajectory_point", 10);
 //   gripper_pub_ = nh_.advertise<std_msgs::Float64MultiArray>("gripper_position", 10);
-
 
 /*******************************************************************************
 * Publisher
@@ -209,29 +214,13 @@ tf::TransformBroadcaster tf_broadcaster;
 /*******************************************************************************
 * SoftwareTimer of Turtlebot3
 *******************************************************************************/
-static uint32_t tTime[10];
+static uint32_t tTime[10]; // TODO check that tTime doesnt overflow due to micros()
 
 /*******************************************************************************
 * Declaration for motor
 *******************************************************************************/
 Turtlebot3MotorDriver motor_driver;
-
-
-/* TODO declare object instance of our custom driver classes  
-    initialize any neccesary variables using MACROS from custom driver class
-    general set up of variables needed for custom driver
-    delete old sample code for openmanip
-*/
-// electromagnetDriver em_driver;
-// armDriver arm_driver;
-// OpenManipulatorDriver manipulator_driver;
-
-// uint8_t joint_id[JOINT_CNT] = {JOINT_ID_1, JOINT_ID_2, JOINT_ID_3, JOINT_ID_4};
-// uint8_t joint_cnt = JOINT_CNT;
-
-// uint8_t gripper_id[GRIPPER_CNT] = {GRIPPER_ID_1};
-// uint8_t gripper_cnt = GRIPPER_CNT;
-
+// TODO jeremy: declare driver class objects if neccesary 
 
 /*******************************************************************************
 * Calculation for odometry
@@ -285,8 +274,10 @@ uint8_t battery_state = 0;
 * Joint Control
 *******************************************************************************/
 // TODO confirm this entire section is needed or edited properly
-bool is_moving        = false;
-std_msgs::Float64MultiArray joint_trajectory_point;
-
+// bool is_moving        = false; //TODO delete if unused
+// std_msgs::Float64MultiArray joint_trajectory_point;
+// builder: intialize float arrays used to maintain joint goal updates from callback functions
+std_msgs::Float64MultiArray la_goal_point;
+std_msgs::Float64MultiArray servo_goal_point;
 
 #endif // TURTLEBOT3_BUILDER_CORE_CONFIG_H_

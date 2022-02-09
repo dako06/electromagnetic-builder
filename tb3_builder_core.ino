@@ -68,6 +68,8 @@ void setup()
 void loop()
 {
   uint32_t t = millis();
+  unsigned long t_mue = micros();
+
   updateTime();
   updateVariable(nh.connected());
   updateTFPrefix(nh.connected());
@@ -123,11 +125,18 @@ void loop()
   }
 #endif
 
-  // TODO confirm this agrees with our impl, this is only in openmanip stack
-  if ((t-tTime[6]) >= (1000 / JOINT_CONTROL_FREQEUNCY))
+  // running at 10 micros (1000000 micros = 1s)
+  if ((t_mue-tTime[6]) >= (1000000 / LINEAR_ACTUATOR_CONTROL_FREQEUNCY))
   {
-    jointControl();
-    tTime[6] = t;
+    // jointControl(); // TODO jeremy: add function call to acuate linear acuator every period
+    tTime[6] = t_mue;
+  }
+
+  // running at 90 ms 
+  if ((t-tTime[7]) >= (1000 / SERVO_CONTROL_FREQEUNCY))
+  {
+    // TODO jeremy: add function call to acuate servos every period
+    tTime[7] = t;
   }
 
   // Send log message after ROS connection

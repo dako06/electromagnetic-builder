@@ -1,5 +1,5 @@
-#ifndef RPR_DRIVER_H_
-#define RPR_DRIVER_H_
+#ifndef RPR_MANIPULATOR_DRIVER_H_
+#define RPR_MANIPULATOR_DRIVER_H_
 
 // include librarys 
 #include <ArduinoQueue.h>

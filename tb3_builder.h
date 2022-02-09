@@ -4,8 +4,8 @@
 #define TB3_BUILDER_H_
 
 // TODO confirm proper header names from custom drivers
-#include "electromagnet_driver.h"
-#include "jeremys_arm_driver.h"
+// #include "electromagnet_driver.h"
+#include "RPR_manipulator_driver.h"
 
 #define NAME                             "Waffle or Waffle Pi"
 
