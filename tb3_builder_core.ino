@@ -128,6 +128,7 @@ void loop()
   {
     servoJointControl(); // TODO jeremy: edit function call to acuate servos every period
     tTime[6] = t;
+  
   }
 
   /* builder: running at 10 micros (1000000 micros = 1s)  
