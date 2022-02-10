@@ -29,6 +29,9 @@ int base_goal_position;
 int base_move_dir;
 float base_angle_tan; // Used in calculating the velocity for the linear actuator; updated
                         // each time the base angle changes
+void Init_Base_Servo();
+float Base_PWM_to_Rad(int PWM_us);
+float Base_Rad_to_PWM(float radians);
 //////////////////////////////////////////////////////////////////////////////////////////
 /**** Stuff for linear actuator ****/
 // Stepper motor wires should be in this order (starting furthest from the capacitor): blue, red, black, green
@@ -46,7 +49,8 @@ float base_angle_tan; // Used in calculating the velocity for the linear actuato
 #define LA_ACCEL_START_PULSE_WIDTH 625 // LA_MAX_VEL_NO_ACCEL converted to pulse width
 #define LA_MAX_VEL_NO_ACCEL 8 // The maximum velocity that the linear actuator can begin moving to from rest, in mm/s
 #define LA_DEFAULT_VEL 10
-#define L0 215
+#define L0 215 // The distance in the x direction from the base joint to the end joint with
+                // the linear actuator fully retracted
 unsigned int LA_curr_position;
 unsigned int LA_goal_position;
 unsigned int LA_accel_rate;
@@ -56,6 +60,14 @@ int LA_move_dir; // 1 for forwards, -1 for reverse
 bool do_accel;
 bool block_place_mode;
 byte step_pin_state;
+void Init_Linear_Actuator();
+void LA_Extend();
+void LA_Retract();
+bool LA_Is_Valid_Position(unsigned int pos);
+void LA_Toggle_Step_Pin();
+void LA_Set_Dir(unsigned int goal_position);
+void LA_Set_Accel_Parameters(float vel_in_mm_per_sec);
+float LA_Pos_mm();
 //////////////////////////////////////////////////////////////////////////////////////////
 /**** Linear actuator move commands ****/
 struct LA_Move_Command {
@@ -78,6 +90,9 @@ Servo End_joint;
 int end_curr_position;
 int end_goal_position;
 int end_move_dir;
+void Init_End_Servo();
+float End_PWM_to_Rad(int PWM_us);
+float End_Rad_to_PWM(float radians);
 //////////////////////////////////////////////////////////////////////////////////////////
 /**** Stuff for coordinating the arm as a whole ****/
 struct Arm_Move_Command {
@@ -92,24 +107,13 @@ Scheduler Arm_Move_Scheduler;
 void Base_Servo_OnDisable();
 void Base_Servo_Move_Callback();
 void Prepare_Base_Servo_Move_Task(int goal_position);
-float Base_PWM_to_Rad(int PWM_us);
-float Base_Rad_to_PWM(float radians);
 Task T_Base_Servo(0,TASK_FOREVER,&Base_Servo_Move_Callback,&Arm_Move_Scheduler,0,NULL,&Base_Servo_OnDisable);
 bool base_servo_move_complete; // flag to tell if the task has completed
 /****** T_Lin_Act: Task which moves the linear actuator to its next position ******/
-void LA_Extend();
-void LA_Retract();
-void Stepper_Driver_Setup();
 void Lin_Act_OnDisable();
 void Lin_Act_Move_Callback();
 void Prepare_LA_Move_Task(LA_Move_Command LA_cmd);
-bool LA_Is_Valid_Position(unsigned int pos);
 void LA_Update_Pulse_Width();
-void LA_Toggle_Step_Pin();
-void LA_Set_Dir(unsigned int goal_position);
-void LA_Set_Accel_Parameters(float vel_in_mm_per_sec);
-float LA_Pos_mm();
-void LA_Reverse(); // Only a temporary measure for moving the linear actuator backwards when the program fails to do so
 Task T_Lin_Act(0,TASK_FOREVER,&Lin_Act_Move_Callback,&Arm_Move_Scheduler,0,NULL,&Lin_Act_OnDisable);
 bool LA_move_complete; // flag to tell if the task has completed
 void Homing_Callback();
@@ -120,8 +124,6 @@ Task T_Homing(LA_ACCEL_START_PULSE_WIDTH,TASK_FOREVER,&Homing_Callback,&Arm_Move
 void End_Servo_OnDisable();
 void End_Servo_Move_Callback();
 void Prepare_End_Servo_Move_Task(int goal_position);
-float End_PWM_to_Rad(int PWM_us);
-float End_Rad_to_PWM(float radians);
 Task T_End_Servo(0,TASK_FOREVER,&End_Servo_Move_Callback,&Arm_Move_Scheduler,0,NULL,&End_Servo_OnDisable);
 bool end_servo_move_complete; // flag to tell if the task has completed
 /****** High-level arm motion functions ******/

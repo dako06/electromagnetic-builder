@@ -37,6 +37,13 @@ void setup()
 
   // builder: intialize driver objects
   // TODO jeremy: call initialization functions if neccesary   
+  Init_Base_Servo();
+  Init_Linear_Actuator();
+  Init_End_Servo();
+  Arm_Move_Scheduler.addTask(T_Base_Servo);
+  Arm_Move_Scheduler.addTask(T_Lin_Act);
+  Arm_Move_Scheduler.addTask(T_End_Servo);
+  Arm_Move_Scheduler.addTask(T_Homing);
 
   // Setting for IMU
   sensors.init();

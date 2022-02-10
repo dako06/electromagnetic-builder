@@ -57,38 +57,20 @@ void Queue_Simple_Move_To_Position(float goal_x, float goal_z) {
   Arm_Move_Queue.enqueue(Move_1);
 }
 
+// Note: All functionality has been moved to the tb3_builder_core setup function,
+  // but this function is kept for independent testing of the robotic arm
 void setup() {
   Serial.begin(115200);
-  ///////////////////////////////////// Base servo setup
-  analogReference(INTERNAL);
-  pinMode(BASE_SIGNAL_PIN, OUTPUT);
-  pinMode(BASE_FEEDBACK_PIN, INPUT);
-  Base_joint.attach(BASE_SIGNAL_PIN);
-  base_curr_position = BASE_ZERO_POSITION_PULSE_WIDTH; // Arm is assumed to start in its home configuration
-  base_move_dir = 1;
-  base_servo_move_complete = 0;
-  ///////////////////////////////////// Linear actuator setup
-  Stepper_Driver_Setup();
-  pinMode(HOMING_SWITCH_PIN, INPUT);
-  LA_Extend();
-  LA_curr_position = 0;
-  LA_curr_pulse_width = LA_ACCEL_START_PULSE_WIDTH;
-  LA_move_dir = 1;
-  do_accel = false;
-  step_pin_state = LOW;
-  ///////////////////////////////////// End servo setup
-  pinMode(END_SIGNAL_PIN, OUTPUT);
-  End_joint.attach(END_SIGNAL_PIN);
-  End_joint.write(END_ZERO_POSITION_PULSE_WIDTH);
-  end_curr_position = END_ZERO_POSITION_PULSE_WIDTH;
-  end_move_dir = 1;
-  end_servo_move_complete = 0;
-  /////////////////////////////////////
+  ////////////////////////// Base servo setup
+  Init_Base_Servo();
+  ////////////////////////// Linear actuator setup
+  Init_Linear_Actuator();
+  ////////////////////////// End servo setup
+  Init_End_Servo();
+  /////////////////////////////////////////////////
   while(!Serial.available());
   Serial.read();
   Serial.println("Begin");
-
-  //LA_Reverse();
 
   //Queue_Simple_Move_To_Position(240, 40);
   //Queue_Pick_Up_Block(250, 10);
@@ -109,6 +91,15 @@ void loop() {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*********************************** Base servo functions ****************************************************/
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void Init_Base_Servo() {
+  analogReference(INTERNAL);
+  pinMode(BASE_SIGNAL_PIN, OUTPUT);
+  pinMode(BASE_FEEDBACK_PIN, INPUT);
+  Base_joint.attach(BASE_SIGNAL_PIN);
+  base_curr_position = BASE_ZERO_POSITION_PULSE_WIDTH; // Arm is assumed to start in its home configuration
+  base_move_dir = 1;
+  base_servo_move_complete = 0;
+}
 void Base_Servo_OnDisable() {
   base_servo_move_complete = 1;
   if (LA_move_complete && end_servo_move_complete) { // Whichever move task finishes last is responsible for starting the next action
@@ -169,6 +160,20 @@ float Base_Rad_to_PWM(float radians) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*********************************** Linear Actuator functions ***********************************************/
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void Init_Linear_Actuator() {
+  pinMode(DIR_PIN, OUTPUT);
+  pinMode(STEP_PIN, OUTPUT);
+  // Mode initialization (Full step)
+  digitalWrite(DIR_PIN, LOW);
+  digitalWrite(STEP_PIN, LOW);
+  pinMode(HOMING_SWITCH_PIN, INPUT);
+  LA_Extend();
+  LA_curr_position = 0;
+  LA_curr_pulse_width = LA_ACCEL_START_PULSE_WIDTH;
+  LA_move_dir = 1;
+  do_accel = false;
+  step_pin_state = LOW;
+}
 
 void Homing_Callback() {
   // Keep moving the linear actuator backwards until it trips the homing switch
@@ -263,7 +268,6 @@ void Lin_Act_OnDisable() {
     Start_Next_Motion();
   }
 }
-
 
 void LA_Set_Accel_Parameters(float vel_in_mm_per_sec) {
   // If the final velocity will be large, add additional acceleration at the start
@@ -369,26 +373,19 @@ void LA_Retract() {
   digitalWrite(DIR_PIN, LOW);
   LA_move_dir = -1;
 }
-void Stepper_Driver_Setup() {
-  pinMode(DIR_PIN, OUTPUT);
-  pinMode(STEP_PIN, OUTPUT);
-  // Mode initialization (Full step)
-  digitalWrite(DIR_PIN, LOW);
-  digitalWrite(STEP_PIN, LOW);
-  delay(1000);
-}
-
-void LA_Reverse() {
-  LA_Retract();
-  while(1) {
-    LA_Toggle_Step_Pin();
-    delayMicroseconds(500);
-  }
-}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*********************************** End servo functions ****************************************************/
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void Init_End_Servo() {
+  pinMode(END_SIGNAL_PIN, OUTPUT);
+  End_joint.attach(END_SIGNAL_PIN);
+  End_joint.write(END_ZERO_POSITION_PULSE_WIDTH);
+  end_curr_position = END_ZERO_POSITION_PULSE_WIDTH;
+  end_move_dir = 1;
+  end_servo_move_complete = 0;
+}
+
 void End_Servo_OnDisable() {
   end_servo_move_complete = 1;
   if (LA_move_complete && base_servo_move_complete) { // Whichever move task finishes last is responsible for starting the next action
