@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 
 import numpy as np
-
+# import cv2 as cv
 
 import smach
-import rospy 
-import sys
-# import tf
-# import cv2 as cv
-# import roslib
+from smach_ros import SimpleActionState
+from electromagnetic_builder.msg import NavigationFeedback
+from electromagnetic_builder.msg import NavigationResult
+from electromagnetic_builder.msg import NavigationAction
 
+import rospy 
+# import sys
+# import tf
+# import roslib
 
 # from math import atan, pi, sqrt, atan2, cos, sin
 # from sensor_msgs.msg import Image
@@ -19,20 +22,17 @@ import sys
 
 
 
-from foreman import Foreman
 
+from foreman import Foreman
 
 
 # global foreman object to maintain constant features
 foreman = Foreman()
 
 
-"""
-        SMACH state machine functions
-"""
+""" SMACH state machine functions """
 
-
-class builderSMInit(smach.State):
+class initializeBuilder(smach.State):
 
     """ initial state of build protocal,
             call initialization functions """
@@ -40,14 +40,10 @@ class builderSMInit(smach.State):
     def __init__(self):
         # state class initialization 
         smach.State.__init__(self, outcomes=['initialization_complete', 'startup_failure'])
-        
 
     def execute(self, userdata):
-
         # call intialization functions
-
         return 'initialization_complete'
-
 
 
 class evaluateBuildStatus(smach.State):
@@ -62,6 +58,7 @@ class evaluateBuildStatus(smach.State):
     def execute(self, userdata):
 
         block_sum = foreman.getBlockTotal()
+        # print(block_sum)
 
         if block_sum == 0:
             print('There are no blocks remaining in blueprint.\nBuild is complete.')
@@ -71,25 +68,23 @@ class evaluateBuildStatus(smach.State):
             
             # update current blueprint index to next block 
             foreman.setNextBlockIndex()
-            print('Total blocks remaining in blueprint: %d.' % block_sum)
+            print("Total blocks remaining in blueprint: ", block_sum)
             return 'build_incomplete'
 
 
 
+class navigationGrid(smach.State):
 
-
-# class navigateToBlockzone(smach.State):
-
-#     def __init__(self, outcomes=['build_complete', 'build_incomplete']):
-#         # state class initialization 
+    def __init__(self, outcomes=['build_complete', 'build_incomplete']):
+        # state class initialization 
         
-#         pass
+        pass
 
-#     def execute(self, userdata):
-#         # state execution 
+    def execute(self, userdata):
+        # state execution 
 
         
-#         return 'build_complete'
+        return 'build_complete'
 
 
 
@@ -108,18 +103,20 @@ def main():
         ''' add states to the sm container '''
         
         # initial state
-        smach.StateMachine.add('INIT_BUILDER', builderSMInit(), 
+        smach.StateMachine.add('INITIALIZE_BUILDER', initializeBuilder(), 
                         transitions={'initialization_complete':'EVALUATE_BUILD_STATUS', 
                             'startup_failure':'system_shutdown'})
 
 
         smach.StateMachine.add('EVALUATE_BUILD_STATUS', evaluateBuildStatus(),
-                               transitions={'build_complete': 'system_shutdown',
+                               transitions={'build_complete':'system_shutdown',
                                     'build_incomplete':'system_shutdown'})
 
-        # smach.StateMachine.add('NAVIGATE_TO_BLOCKZONE', navigateToBlockzone(),
-        #                        transitions={'arrived':'ESTIMATE_BLOCK_CANDIDATE', })
-        #                             # 'outcome2':'outcome4'})
+        def goal_callback(userdata, goal):
+            pass
+
+        smach.StateMachine.add('NAVIGATE_TO_ZONE', navigationGrid(), 
+                                transitions={'arrived':'ESTIMATE_BLOCK_CANDIDATE'})
 
 
         # smach.StateMachine.add('ESTIMATE_BLOCK_CANDIDATE', estimateBlockCandidate(),

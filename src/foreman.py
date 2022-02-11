@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from numpy import linalg
 
+DEBUG = 1
 
 class Foreman:
 
@@ -29,60 +30,77 @@ class Foreman:
 
         #### blueprint object ####
         # file path to raw blueprint excel file
-        self.path_blueprint_xlsx = '~/catkin_ws/src/foreman_controller/blueprint_raw.xlsx'
+        self.fpath_blueprint_xlsx = '~/catkin_ws/src/electromagnetic-builder/blueprint_raw.xlsx'
 
         # create blueprint object
         self.blueprint = self.createBlueprint(self.fpath_blueprint_xlsx)
 
+        if (DEBUG):
+            print('Blueprint matrix has been initialized.')
+            print(self.blueprint)
+        
     def createBlueprint(self, fpath):
 
         """ construct blueprint """
-        blueprint_raw = pd.read_excel(io=fpath)         # read in excel file as panda data structure
-        self.blueprint = np.array(blueprint_raw.values) # convert to np array
-        print('Bluerprint matrix has been initialized.')
+        blueprint_raw = pd.read_excel(io=fpath) # read in excel file as panda data structure
+        return np.array(blueprint_raw.values)   # convert to np array
+ 
 
 
     def getBlockTotal(self):
             total_sum = np.sum(self.blueprint)
 
+            if (DEBUG):
+                print('Total blocks: ')
+                print(total_sum)
+
+            return total_sum
+
     def setNextBlockIndex(self):
 
-        tmp_ix = self.current_block_ix
+        # i - row index and base y-coordinate
+        # j - column index and base x-coordinate
+        i, j = self.current_block_ix
         
         # check if there are blocks remaining to be stacked at this position
-        if self.blueprint[tmp_ix[0], tmp_ix[1]] != 0:
+        if self.blueprint[i, j] != 0:
+
+            if (DEBUG):
+                print("Blocks left at this index: ", self.blueprint[i, j])
+            
             # dont adjust placement index
             return 
 
         else:
 
-            # update placement index with next nonzero value 
-
-            i = tmp_ix[0]   # row index and base y-coordinate 
-            j = tmp_ix[1]   # column index and base x-coordinate
-
-            # adjust index until nonzero value breaks loop
+            # adjust index until nonzero element breaks loop
             while self.blueprint[i, j] == 0:
 
-                if tmp_ix[j] + 1 < self.COL_MAX:
-                    # move along column
-                    j+=1
-                elif tmp_ix[j] + 1 >= self.COL_MAX and tmp_ix[i] + 1 < self.ROW_MAX:
-                    # start at next row if inbounds
-                    i+=1
-                    j=0
-                elif tmp_ix[j] + 1 >= self.COL_MAX and tmp_ix[i] + 1 >= self.ROW_MAX: 
-                    print('End of Blueprint reached when setting next block index.')
+                if j+1 < self.COL_MAX:
+                    j+=1  # iterate across column
 
-            # reset current index and return
-            self.current_block_ix = (i,j)
+                elif j+1 >= self.COL_MAX and i+1 < self.ROW_MAX:
+                    i+=1    # update row 
+                    j=0     # reset column
+
+                elif j+1 >= self.COL_MAX and i+1 >= self.ROW_MAX: 
+                    print('ERROR: end of Blueprint reached when setting next block index.')
+
+
+            self.current_block_ix = (i,j)   # update current index
+            self.setNextBlockCoordinate()   # update current x,y coordinate
+
+            if(DEBUG):
+                print("updated block index: ", self.current_block_ix)
+                print("updated (x,y) coordinate: ", self.current_block_xy)
+
             return 
+
+
     def setNextBlockCoordinate(self):
-        """
-            set the (x,y) coordinate corresponding to the current blueprint block index
+        """ set the (x,y) coordinate corresponding to the current blueprint block index
                 x - row index * block width + x offset from origin
-                y - (row max - column index - 1) * block length + y offset from origin   
-        """
+                y - (row max - column index - 1) * block length + y offset from origin   """
 
         x = self.current_block_ix[1]*self.BLOCK_WIDTH + self.block_center_mask[0]
         y = (self.ROW_MAX-self.current_block_ix[0]-1)*self.BLOCK_LENGTH + self.block_center_mask[1]
