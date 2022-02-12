@@ -127,6 +127,7 @@ void loop()
 
   /* builder: statement executes at 90 ms
       function call executes control of base and end servo of the RPR manipulator */ 
+      // Maybe we should replace the statement on the right side of the comparison with a single integer
   if ((t-tTime[6]) >= (1000 / SERVO_CONTROL_FREQEUNCY))
   {
     servoJointControl(); // TODO jeremy: edit function call to acuate servos every period
@@ -136,7 +137,7 @@ void loop()
 
   /* builder: running at 10 micros (1000000 micros = 1s)  
       function call executes control of the linear actuator fo the RPR manipulator */
-  if ((t_micros-tTimeMicros[0]) >= (1000000 / LINEAR_ACTUATOR_CONTROL_FREQEUNCY))
+  if ((t_micros-tTimeMicros[0]) >= LA_curr_pulse_width)
   {
     LAJointControl(); // TODO jeremy: edit this function to control linear acuator every period
     tTimeMicros[0] = t_micros;
@@ -657,6 +658,14 @@ void LAJointControl(void)
 {
   // TODO jeremy: implement linear actual joint control here, this is called in software loop each period
   
+  if (LA_is_moving) {
+    if (LA_is_homing) {
+      Homing_Callback();
+    }
+    else {
+      Lin_Act_Move_Callback();
+    }
+  }
 }
 
 // TODO for reference of openmanip impl remove if not needed
@@ -722,7 +731,18 @@ void servoJointControl(void)
 {
   /* TODO jeremy: implement base/end servo joint control here, 
     this is called in software loop each period */
-  
+
+  // base_is_moving is set true by whatever starts moving the arm, and is set
+    // false inside of Base_Servo_Move_Callback
+  if (base_is_moving) {
+    Base_Servo_Move_Callback();
+  }
+  // end_is_moving is set true by whatever starts moving the arm, and is set
+    // false inside of End_Servo_Move_Callback
+  if (end_is_moving) {
+    End_Servo_Move_Callback();
+  }
+
 }
 
 

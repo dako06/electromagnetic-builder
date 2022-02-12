@@ -1,4 +1,6 @@
-#include "RPR_manipulator_driver.h"
+#include "RPR_base_servo.h"
+#include "RPR_linear_actuator.h"
+#include "RPR_end_servo.h"
 
 void Start_Next_Motion() {
   //while(!Serial.available());
@@ -58,8 +60,7 @@ void Queue_Simple_Move_To_Position(float goal_x, float goal_z) {
 }
 
 // Note: All functionality has been moved to the tb3_builder_core setup function,
-  // but this function is kept for independent testing of the robotic arm
-void setup() {
+/* void setup() {
   Serial.begin(115200);
   ////////////////////////// Base servo setup
   Init_Base_Servo();
@@ -82,11 +83,7 @@ void setup() {
   Arm_Move_Scheduler.addTask(T_Homing);
   //Start_Next_Motion();
   Start_LA_Homing();
-}
-
-void loop() {
-  Arm_Move_Scheduler.execute();
-}
+} */
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*********************************** Base servo functions ****************************************************/
@@ -98,47 +95,34 @@ void Init_Base_Servo() {
   Base_joint.attach(BASE_SIGNAL_PIN);
   base_curr_position = BASE_ZERO_POSITION_PULSE_WIDTH; // Arm is assumed to start in its home configuration
   base_move_dir = 1;
-  base_servo_move_complete = 0;
-}
-void Base_Servo_OnDisable() {
-  base_servo_move_complete = 1;
-  if (LA_move_complete && end_servo_move_complete) { // Whichever move task finishes last is responsible for starting the next action
-    Start_Next_Motion();
-  }
+  base_is_moving = false;
 }
 void Base_Servo_Move_Callback() {
-  //Serial.println("Entering Base_Servo_Move_Callback");
-  // The base servo position needs to be updated as the base servo arrives at the position that was calculated in the previous iteration
-  static int last_position = 0;
-  if (last_position != 0) {
-    base_curr_position = last_position;
+  // The base servo position needs to be updated as the base servo arrives at the position that was calculated 
+    // in the previous iteration. When this function is first called, the base servo will be arriving at the position which
+    // was assigned to new_position at the end of the previous iteration, and the current position is updated to reflect this
+  static int new_position = 0;
+  if (new_position != 0) {
+    base_curr_position = new_position;
   }
-  //Serial.println(base_curr_position);
   int new_position = base_curr_position + (base_move_dir * BASE_WIDTH_INCREMENT);
-  if (new_position >= BASE_MIN_PULSE_WIDTH && new_position <= BASE_MAX_PULSE_WIDTH) {
+  if (Base_Is_Valid_Position(new_position)) {
     // Do not start a for loop if we are already within 1 iteration of the target position
     if (abs(new_position - base_goal_position) <= BASE_WIDTH_INCREMENT) {
       Base_joint.write(new_position);
-      // Goal position reached; the task is finished for now
-      Serial.println("Goal position reached");
-      T_Base_Servo.disable();
+      // Goal position reached
+      base_is_moving = false;
     }
     else {
       Base_joint.write(new_position);
     }
-    // The tangent calculation is based on the average of the starting angle and the final angle for this
-      // step in the base servo's movement
-    int pwm_avg = (new_position + base_curr_position)/2;
-    base_angle_tan = fabs(tan(Base_PWM_to_Rad(pwm_avg)));
-    last_position = new_position;
+    Update_Base_Angle_Tan(new_position);
   }
   else {
     Serial.print("new_position was invalid in Base_Servo_Move_Callback: ");
     Serial.println(new_position);
-    T_Base_Servo.disable();
+    base_is_moving = false;
   }
-  Serial.println(base_curr_position);
-  Serial.println("--------------------------");
 }
 void Prepare_Base_Servo_Move_Task(int goal_position) {
   if (goal_position > BASE_MAX_PULSE_WIDTH || goal_position < BASE_MIN_PULSE_WIDTH) {
@@ -157,6 +141,15 @@ float Base_PWM_to_Rad(int PWM_us) {
 float Base_Rad_to_PWM(float radians) {
   return (int)(radians*RAD_TO_DEG)*10 + BASE_ZERO_POSITION_PULSE_WIDTH;
 }
+bool Base_Is_Valid_Position(int position) {
+  return position >= BASE_MIN_PULSE_WIDTH && new_position <= BASE_MAX_PULSE_WIDTH;
+}
+void Update_Base_Angle_Tan(int new_position) {
+  // The tangent calculation is based on the average of the starting angle and the final angle for this
+      // step in the base servo's movement
+    int pwm_avg = (new_position + base_curr_position)/2;
+    base_angle_tan = fabs(tan(Base_PWM_to_Rad(pwm_avg)));
+}
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*********************************** Linear Actuator functions ***********************************************/
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -171,8 +164,12 @@ void Init_Linear_Actuator() {
   LA_curr_position = 0;
   LA_curr_pulse_width = LA_ACCEL_START_PULSE_WIDTH;
   LA_move_dir = 1;
-  do_accel = false;
   step_pin_state = LOW;
+  LA_is_moving = false; // flag to tell if the task has completed
+  LA_is_homing = false;
+  LA_is_accelerating = false;
+  LA_is_decelerating = false;
+  block_place_mode = false;
 }
 
 void Homing_Callback() {
@@ -182,9 +179,9 @@ void Homing_Callback() {
   // When the homing switch is not pressed, the pin connected to the OpenCR is 
     // connected to ground. When the switch is pressed, it is pulled up to 5V
   if (digitalRead(HOMING_SWITCH_PIN)) {
-    Serial.println("New home position reached");
     LA_curr_position = 0; 
-    T_Homing.disable();
+    LA_is_homing = false;
+    LA_is_moving = false;
     return;
   }
   else {
@@ -192,13 +189,8 @@ void Homing_Callback() {
   }
 }
 
-void Homing_OnDisable() {
-  LA_move_complete = 1;
-  // Return control to whatever code was being run before homing started
-}
-
 // Bring the linear actuator back until it trips the homing limit switch
-void Start_LA_Homing() {
+/* void Start_LA_Homing() {
   if (T_Base_Servo.isEnabled() || T_Lin_Act.isEnabled() || T_End_Servo.isEnabled()) {
     Serial.println("Could not execute homing, another motion task is currently enabled");
   }
@@ -208,33 +200,25 @@ void Start_LA_Homing() {
   LA_Retract();
   LA_move_complete = 0;
   T_Homing.restart();
-}
+} */
 
 void Lin_Act_Move_Callback() {
-  static unsigned int steps_this_move = 0; // How many steps the linear actuator has moved on the current motion task
   // Check for out-of-bounds motion
   if (!LA_Is_Valid_Position(LA_curr_position)) {
     Serial.println("Linear actuator limit reached");
-    T_Lin_Act.disable();
+    LA_is_moving = false;
   }
   // Check if goal has been reached
   if (LA_curr_position == LA_goal_position) {
-    steps_this_move = 0;
     digitalWrite(STEP_PIN, LOW); // Since a pulse is in progress, set the pin low before stopping
-    T_Lin_Act.disable();
+    LA_is_moving = false;
     return;
   }
   LA_Update_Pulse_Width();
   LA_Toggle_Step_Pin();
   if (step_pin_state == HIGH) {
     LA_curr_position += LA_move_dir;
-    steps_this_move++;
-    //Serial.println("-----------------------------------");
-    //Serial.print("Current Position: "); Serial.println(LA_curr_position);
-    //Serial.print("Steps this move: "); Serial.println(steps_this_move);
-    //Serial.println("-----------------------------------");
   }
-  T_Lin_Act.setInterval(LA_curr_pulse_width);
 }
 void Prepare_LA_Move_Task(LA_Move_Command LA_cmd) {
   //Serial.println("Entered Prepare_LA_Move_Task");
@@ -261,90 +245,74 @@ void Prepare_LA_Move_Task(LA_Move_Command LA_cmd) {
   LA_move_complete = 0;
   //Serial.println("Finished Prepare_LA_Move_Task");
 }
-void Lin_Act_OnDisable() {
-  LA_move_complete = 1;
-  if (base_servo_move_complete && end_servo_move_complete) { // Whichever move task finishes last is responsible for starting the next action
-    delay(500); // Do not attempt to move too close to the end of previous motion, especially if the movements are in opposite directions
-    Start_Next_Motion();
-  }
-}
 
 void LA_Set_Accel_Parameters(float vel_in_mm_per_sec) {
+  LA_is_accelerating = false; // Will be set true if the LA needs to accelerate (unless in block place mode)
   // If the final velocity will be large, add additional acceleration at the start
-  if (block_place_mode && (abs(base_goal_position - 1500) > abs(base_curr_position - 1500))) {
+  /* if (block_place_mode && (abs(base_goal_position - 1500) > abs(base_curr_position - 1500))) {
     float final_vel = BASE_DEFAULT_VEL * (L0 + LA_goal_position/100) * fabs(tan(Base_PWM_to_Rad(base_goal_position)));
     LA_accel_rate = 1;
     LA_goal_pulse_width = (unsigned int)((1.0/final_vel)*5000 + 0.5);
     LA_curr_pulse_width = LA_ACCEL_START_PULSE_WIDTH;
-    do_accel = true;
+  } */
+  if (block_place_mode) {
+    // Goal pulse width is not used since it updates over time
+    float vel_to_match = BASE_DEFAULT_VEL * (L0 + LA_Pos_mm()) * base_angle_tan;
+    LA_curr_pulse_width = LA_Vel_To_Pulse_Width(vel_to_match);
   }
-  // Need to check whether there is enough steps available to reach the target velocity (only an issue for small movements)
-  //unsigned int accel_steps;
-  //unsigned int final_pulse_width;
   else if (vel_in_mm_per_sec > LA_MAX_VEL_NO_ACCEL) {
-    // How many steps are used to reach full velocity is based on how much greater the target velocity is than the maximum velocity that the linear
-      // actuator can achieve without acceleration
-    // The pulse width will decrease by a fixed amount each time it changes, but the number and frequency of changes during acceleration depends
-    //accel_steps = (unsigned int)(vel_in_mm_per_sec / LA_MAX_VEL_NO_ACCEL) * 50; 
-    //final_pulse_width = (unsigned int)((1.0/vel_in_mm_per_sec)*5000 + 0.5);
-    //accel_rate = (LA_ACCEL_START_PULSE_WIDTH - final_pulse_width)/accel_steps; // How much to change the pulse width after each step while accelerating
-    LA_accel_rate = 1;
+    LA_is_accelerating = true;
     LA_goal_pulse_width = (unsigned int)((1.0/vel_in_mm_per_sec)*5000 + 0.5);
     LA_curr_pulse_width = LA_ACCEL_START_PULSE_WIDTH;
-    do_accel = true;
   }
   else {
     LA_curr_pulse_width = (unsigned int)((1.0/vel_in_mm_per_sec)*5000 + 0.5);
-    do_accel = false;
   }
 }
 void LA_Update_Pulse_Width() {
-  /*if (block_place_mode) {
-    float new_vel = BASE_DEFAULT_VEL * (L0 + LA_Pos_mm()) * base_angle_tan;
-    LA_goal_pulse_width = (unsigned int)((1.0/new_vel)*5000 + 0.5);
-      // Use for debugging; print information every 100 iterations to avoid taking up too much time
-      static int i = 0;
-      if (i == 100) {
-        Serial.println(new_vel);
-        //Serial.println(LA_curr_position);
-        Serial.println("--------------------------");
-        i = 0;
-      }
-      else {
-        i++;
-      }
-  }*/
-  if (do_accel) {
-    if (LA_curr_pulse_width > LA_goal_pulse_width) {
-      LA_curr_pulse_width -= min(LA_curr_pulse_width - LA_goal_pulse_width, LA_accel_rate);
+  // In order to cut down on unnecessary calculations, the velocity to match is only calculated on every 100 executions
+    // of this function; the velocity is still updated on every execution however
+  static unsigned long vel_update_counter = 0;
+  static unsigned int pulse_width_to_match = LA_MAX_PULSE_WIDTH;
+  vel_update_counter = LA_is_moving ? (vel_update_counter + 1) : 0;
+  if (block_place_mode) {
+    if (vel_update_counter % 100 == 0) {
+      float vel_to_match = BASE_DEFAULT_VEL * (L0 + LA_Pos_mm()) * base_angle_tan;
+      pulse_width_to_match = LA_Vel_To_Pulse_Width(vel_to_match);
+    }
+    if (abs(LA_curr_pulse_width - pulse_width_to_match) <= LA_accel_rate) {
+      LA_curr_pulse_width = pulse_width_to_match;
     }
     else {
-      do_accel = false;
-      Serial.println("Finished acceleration");
+      if (LA_curr_pulse_width > pulse_width_to_match) {
+        LA_curr_pulse_width -= LA_accel_rate;
+      }
+      else if (LA_curr_pulse_width < pulse_width_to_match) {
+        LA_curr_pulse_width += LA_accel_rate;
+      }
     }
   }
-  else if (block_place_mode) {
-    if (LA_curr_pulse_width > LA_goal_pulse_width) {
-      do_accel = true;
+  else {
+    if (LA_is_accelerating) {
+      LA_curr_pulse_width -= min(LA_curr_pulse_width - LA_goal_pulse_width, LA_accel_rate);
+      if (LA_curr_pulse_width <= LA_goal_pulse_width) {
+        LA_is_accelerating = 0;
+      }
     }
-      //LA_curr_pulse_width = LA_goal_pulse_width;
+    else if (LA_is_decelerating) {
+      LA_curr_pulse_width += min(LA_goal_pulse_width - LA_curr_pulse_width, LA_accel_rate);
+      if (LA_curr_pulse_width >= LA_goal_pulse_width) {
+        LA_is_decelerating = 0;
+      }
+    }
   }
+ // Just to be safe
   if (LA_curr_pulse_width < LA_MIN_PULSE_WIDTH) {
     LA_curr_pulse_width = LA_MIN_PULSE_WIDTH;
   }
   if (LA_curr_pulse_width > LA_MAX_PULSE_WIDTH) {
     LA_curr_pulse_width = LA_MAX_PULSE_WIDTH;
   }
-  /*
-  static int i = 0;
-  if (i == 100) {
-    Serial.print("New pulse width : "); Serial.println(LA_curr_pulse_width);
-    Serial.println("--------------------------");
-    i = 0;
-  }
-  else {
-    i++;
-  }*/
 }
 float LA_Pos_mm() {
   return (float)LA_curr_position * 0.01;
@@ -356,7 +324,6 @@ void LA_Set_Dir(unsigned int goal_position) {
   else {
     LA_Retract();
   }
-  //Serial.println(LA_move_dir);
 }
 void LA_Toggle_Step_Pin() {
   step_pin_state = step_pin_state ? LOW : HIGH;
@@ -373,6 +340,9 @@ void LA_Retract() {
   digitalWrite(DIR_PIN, LOW);
   LA_move_dir = -1;
 }
+unsigned int LA_Vel_To_Pulse_Width(float vel_in_mm_per_sec) {
+  return (1.0/vel_in_mm_per_sec)*5000 + 0.5;
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*********************************** End servo functions ****************************************************/
@@ -383,41 +353,32 @@ void Init_End_Servo() {
   End_joint.write(END_ZERO_POSITION_PULSE_WIDTH);
   end_curr_position = END_ZERO_POSITION_PULSE_WIDTH;
   end_move_dir = 1;
-  end_servo_move_complete = 0;
-}
-
-void End_Servo_OnDisable() {
-  end_servo_move_complete = 1;
-  if (LA_move_complete && base_servo_move_complete) { // Whichever move task finishes last is responsible for starting the next action
-    Start_Next_Motion();
-  }
+  end_is_moving = false;
 }
 void End_Servo_Move_Callback() {
-  //Serial.println("Entering End_Servo_Move_Callback");
-  // The end servo position needs to be updated as the end servo arrives at the position that was calculated in the previous iteration
-  static int last_position = 0;
-  if (last_position != 0) {
-    end_curr_position = last_position;
+  // The end servo position needs to be updated as the end servo arrives at the position that was calculated 
+    // in the previous iteration. When this function is first called, the end servo will be arriving at the position which
+    // was assigned to new_position at the end of the previous iteration, and the current position is updated to reflect this
+  static int new_position = 0;
+  if (new_position != 0) {
+    end_curr_position = new_position;
   }
-  //Serial.println(end_curr_position);
   int new_position = end_curr_position + (end_move_dir * END_WIDTH_INCREMENT);
   if (new_position >= END_MIN_PULSE_WIDTH && new_position <= END_MAX_PULSE_WIDTH) {
     // Do not start a for loop if we are already within 1 iteration of the target position
     if (abs(new_position - end_goal_position) <= END_WIDTH_INCREMENT) {
       End_joint.write(new_position);
-      // Goal position reached; the task is finished for now
-      Serial.println("Goal position reached");
-      T_End_Servo.disable();
+      // Goal position reached
+      end_is_moving = false;
     }
     else {
       End_joint.write(new_position);
     }
-    last_position = new_position;
   }
   else {
     Serial.print("new_position was invalid in End_Servo_Move_Callback: ");
     Serial.println(new_position);
-    T_End_Servo.disable();
+    end_is_moving = false;
   }
 }
 void Prepare_End_Servo_Move_Task(int goal_position) {
@@ -435,6 +396,9 @@ float End_PWM_to_Rad(int PWM_us) {
 }
 float End_Rad_to_PWM(float radians) {
   return (int)(radians*RAD_TO_DEG)*10 + END_ZERO_POSITION_PULSE_WIDTH;
+}
+bool End_Is_Valid_Position(int position) {
+  return position >= END_MIN_PULSE_WIDTH && new_position <= END_MAX_PULSE_WIDTH;
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*********************************** High-level arm motion functions *****************************************/

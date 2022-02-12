@@ -12,7 +12,8 @@
 
 //////////////////////////////////////////////////////////////////////////////////////////
 /**** Stuff for base servo ****/
-Servo Base_joint;
+#include "RPR_base_servo.h"
+/* Servo Base_joint;
 #define BASE_SIGNAL_PIN 3
 #define BASE_FEEDBACK_PIN A0
 #define BASE_MIN_PULSE_WIDTH 1200 // The mechanical limit is 900, but only part of the full range is used
@@ -32,9 +33,12 @@ float base_angle_tan; // Used in calculating the velocity for the linear actuato
 void Init_Base_Servo();
 float Base_PWM_to_Rad(int PWM_us);
 float Base_Rad_to_PWM(float radians);
+bool Base_Is_Valid_Position(int position);
+void Update_Base_Angle_Tan(int new_position); */
 //////////////////////////////////////////////////////////////////////////////////////////
 /**** Stuff for linear actuator ****/
-// Stepper motor wires should be in this order (starting furthest from the capacitor): blue, red, black, green
+#include "RPR_linear_actuator.h"
+/* // Stepper motor wires should be in this order (starting furthest from the capacitor): blue, red, black, green
 #define STEP_PIN 5
 #define DIR_PIN 4
 #define HOMING_SWITCH_PIN 7
@@ -67,18 +71,19 @@ bool LA_Is_Valid_Position(unsigned int pos);
 void LA_Toggle_Step_Pin();
 void LA_Set_Dir(unsigned int goal_position);
 void LA_Set_Accel_Parameters(float vel_in_mm_per_sec);
-float LA_Pos_mm();
+float LA_Pos_mm(); */
 //////////////////////////////////////////////////////////////////////////////////////////
 /**** Linear actuator move commands ****/
-struct LA_Move_Command {
+/* struct LA_Move_Command {
   unsigned int goal_position;
   bool block_place_mode;
   float vel_in_mm_per_sec;
-};
+}; */
 #define QUEUE_MAX_SIZE 10
 //////////////////////////////////////////////////////////////////////////////////////////
 /**** Stuff for end servo ****/
-Servo End_joint;
+#include "RPR_end_servo.h"
+/* Servo End_joint;
 #define END_SIGNAL_PIN 6
 #define END_MIN_PULSE_WIDTH 800 
 #define END_ZERO_POSITION_PULSE_WIDTH 1400
@@ -92,7 +97,7 @@ int end_goal_position;
 int end_move_dir;
 void Init_End_Servo();
 float End_PWM_to_Rad(int PWM_us);
-float End_Rad_to_PWM(float radians);
+float End_Rad_to_PWM(float radians); */
 //////////////////////////////////////////////////////////////////////////////////////////
 /**** Stuff for coordinating the arm as a whole ****/
 struct Arm_Move_Command {
@@ -104,13 +109,14 @@ ArduinoQueue<Arm_Move_Command> Arm_Move_Queue(QUEUE_MAX_SIZE);
 //////////////////////////////////////////////////////////////////////////////////////////
 Scheduler Arm_Move_Scheduler;
 /****** T_Base_Servo: Task which moves the base servo to its next position ******/
-void Base_Servo_OnDisable();
+/* //void Base_Servo_OnDisable();
 void Base_Servo_Move_Callback();
 void Prepare_Base_Servo_Move_Task(int goal_position);
 Task T_Base_Servo(0,TASK_FOREVER,&Base_Servo_Move_Callback,&Arm_Move_Scheduler,0,NULL,&Base_Servo_OnDisable);
-bool base_servo_move_complete; // flag to tell if the task has completed
+//bool base_servo_move_complete; // flag to tell if the task has completed
+bool base_is_moving; */
 /****** T_Lin_Act: Task which moves the linear actuator to its next position ******/
-void Lin_Act_OnDisable();
+/* void Lin_Act_OnDisable();
 void Lin_Act_Move_Callback();
 void Prepare_LA_Move_Task(LA_Move_Command LA_cmd);
 void LA_Update_Pulse_Width();
@@ -119,13 +125,13 @@ bool LA_move_complete; // flag to tell if the task has completed
 void Homing_Callback();
 void Homing_OnDisable();
 void Start_LA_Homing();
-Task T_Homing(LA_ACCEL_START_PULSE_WIDTH,TASK_FOREVER,&Homing_Callback,&Arm_Move_Scheduler,0,NULL,&Homing_OnDisable);
+Task T_Homing(LA_ACCEL_START_PULSE_WIDTH,TASK_FOREVER,&Homing_Callback,&Arm_Move_Scheduler,0,NULL,&Homing_OnDisable); */
 /****** T_End_Servo: Task which moves the base servo to its next position ******/
-void End_Servo_OnDisable();
+/* void End_Servo_OnDisable();
 void End_Servo_Move_Callback();
 void Prepare_End_Servo_Move_Task(int goal_position);
 Task T_End_Servo(0,TASK_FOREVER,&End_Servo_Move_Callback,&Arm_Move_Scheduler,0,NULL,&End_Servo_OnDisable);
-bool end_servo_move_complete; // flag to tell if the task has completed
+bool end_servo_move_complete; // flag to tell if the task has completed */
 /****** High-level arm motion functions ******/
 void Go_To_Home();
 void Start_Next_Motion();
