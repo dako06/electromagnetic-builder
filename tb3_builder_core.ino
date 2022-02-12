@@ -1,8 +1,10 @@
 #include "tb3_builder_core_config.h"
+#include "RPR_manipulator_driver.hpp"
 
 /*******************************************************************************
 * Setup function
 *******************************************************************************/
+
 void setup()
 {
   DEBUG_SERIAL.begin(57600);
@@ -36,7 +38,6 @@ void setup()
   motor_driver.init(NAME);
 
   // builder: intialize driver objects
-  // TODO jeremy: call initialization functions if neccesary   
   Init_Base_Servo();
   Init_Linear_Actuator();
   Init_End_Servo();
@@ -208,7 +209,7 @@ void LAJointCallback(const std_msgs::Float64MultiArray& LA_joint_msg)
   // }
 
   // TODO complete call back
-  la_goal_point = LA_joint_msg;
+//  la_goal_point = LA_joint_msg;
 }
 
 /*******************************************************************************
@@ -225,7 +226,7 @@ void servoJointCallback(const std_msgs::Float64MultiArray& servo_msg)
   // manipulator_driver.writeGripperPosition(goal_gripper_position);
 
   // TODO complete call back
-  servo_goal_point = servo_msg;  
+//  servo_goal_point = servo_msg;  
 }
 
 
