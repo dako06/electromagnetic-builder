@@ -144,6 +144,14 @@ void loop()
     tTimeMicros[0] = t_micros;
   }
 
+  // If there is a move command in the queue and the arm is not currently moving,
+    // start the next motion
+  if (!(base_is_moving || LA_is_moving || end_is_moving)) {
+    if (!Arm_Move_Queue.isEmpty()) {
+      Prepare_Arm_Motion(Arm_Move_Queue.dequeue());
+    }
+  }
+
   // Send log message after ROS connection
   sendLogMsg();
 
