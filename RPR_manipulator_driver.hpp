@@ -1,23 +1,5 @@
 #include "RPR_manipulator_driver.h"
 
-//void Start_Next_Motion() {
-//  //while(!Serial.available());
-//   // Serial.read();
-//  if (!Arm_Move_Queue.isEmpty()) {
-//    Serial.println("Executing move");
-//    Arm_Move_Command next = Arm_Move_Queue.dequeue();
-//    Prepare_Base_Servo_Move_Task(next.base_cmd);
-//    Prepare_LA_Move_Task(next.LA_cmd);
-//    Prepare_End_Servo_Move_Task(next.end_cmd);
-//    T_Base_Servo.restart();
-//    T_Lin_Act.restart();
-//    T_End_Servo.restart();
-//  }
-//  else {
-//    Go_To_Home();  // For testing purposes, return to home position after the test finishes
-//  }
-//}
-
 // All parameters should be in mm
 //void Queue_Pick_Up_Block(float block_x, float block_z) {
 //  // First move: move to a point 2 cm above the top of the block (given by block_z)
@@ -402,6 +384,18 @@ bool End_Is_Valid_Position(int position) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*********************************** High-level arm motion functions *****************************************/
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void Prepare_Arm_Motion(Arm_Move_Command cmd) {
+  if (cmd.joints_to_move[0]) {
+    Prepare_Base_Servo_Move_Task(cmd.base_cmd);
+  }
+  if (cmd.joints_to_move[1]) {
+    Prepare_LA_Move_Task(cmd.LA_cmd);
+  }
+  if (cmd.joints_to_move[2]) {
+    Prepare_End_Servo_Move_Task(cmd.end_cmd);
+  }
+}
+
 //void Go_To_Home() {
 //  Serial.println("Waiting for signal to return to home");
 //  while(!Serial.available());
@@ -436,11 +430,11 @@ bool End_Is_Valid_Position(int position) {
 //  T_End_Servo.restart();
 //}
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/*********************************** Test functions **********************************************************/
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/*
 void Test_Joints() {
-  // First initialize everything
-  Init_Base_Servo();
-  Init_Linear_Actuator();
-  Init_End_Servo();
   // Test range of motion for base servo
   base_goal_position = BASE_MAX_PULSE_WIDTH;
   base_is_moving = true;
@@ -452,5 +446,5 @@ void Test_Joints() {
   while(base_is_moving) {
     loop();
   }
-  DEBUG_SERIAL.println("Finished testing end servo")
-}
+  DEBUG_SERIAL.println("Finished testing base servo");
+}*/
