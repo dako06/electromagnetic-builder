@@ -674,12 +674,10 @@ void LAJointControl(void)
   // const double JOINT_CONTROL_PERIOD = 1.0f / (double)JOINT_CONTROL_FREQEUNCY;
 //   static uint8_t wait_for_write = 0;
 //   static uint8_t loop_cnt = 0;
-
 //   if (is_moving == true)
 //   {
 //     uint32_t all_points_cnt = joint_trajectory_point.data_length;
 //     uint8_t write_cnt = 0;
-
 //     if (loop_cnt < (wait_for_write))
 //     {
 //       loop_cnt++;
@@ -689,11 +687,9 @@ void LAJointControl(void)
 //     {
 //       double goal_joint_position[joint_cnt];
 //       double move_time = 0.0f;
-
 //       if (points == 0) move_time = joint_trajectory_point.data[points + POINT_SIZE] - joint_trajectory_point.data[points];
 //       else if ((points + POINT_SIZE) >= all_points_cnt) move_time = joint_trajectory_point.data[points] / 2.0f;
 //       else  move_time = joint_trajectory_point.data[points] - joint_trajectory_point.data[points - POINT_SIZE];
-
 //       for (uint32_t positions = points + 1; positions < (points + POINT_SIZE); positions++)
 //       {        
 //         if ((points + POINT_SIZE) >= all_points_cnt)
@@ -707,13 +703,10 @@ void LAJointControl(void)
 //         }
 //         write_cnt++;
 //       }
-
 //       manipulator_driver.writeJointProfileControlParam(move_time * 2.0f);
 //       manipulator_driver.writeJointPosition(goal_joint_position);
-
 //       wait_for_write = move_time / JOINT_CONTROL_PERIOD;
 //       points = points + POINT_SIZE;
-
 //       if (points >= all_points_cnt)
 //       {
 //         points = 0;

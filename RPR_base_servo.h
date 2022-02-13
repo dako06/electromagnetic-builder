@@ -16,7 +16,7 @@ Servo Base_joint;
 #define BASE_DEFAULT_VEL 0.05 // Converted to radians
 int base_curr_position;
 int base_goal_position;
-int base_move_dir;
+int base_move_dir; // TODO: remove this global variable and determine direction from within the callback function
 bool base_is_moving;
 float base_angle_tan; // Used in calculating the velocity for the linear actuator; updated
                         // each time the base angle changes

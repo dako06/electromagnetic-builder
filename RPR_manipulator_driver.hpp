@@ -435,3 +435,22 @@ bool End_Is_Valid_Position(int position) {
 //  T_Lin_Act.restart();
 //  T_End_Servo.restart();
 //}
+
+void Test_Joints() {
+  // First initialize everything
+  Init_Base_Servo();
+  Init_Linear_Actuator();
+  Init_End_Servo();
+  // Test range of motion for base servo
+  base_goal_position = BASE_MAX_PULSE_WIDTH;
+  base_is_moving = true;
+  while(base_is_moving) {
+    loop();
+  }
+  base_goal_position = BASE_MIN_PULSE_WIDTH;
+  base_is_moving = true;
+  while(base_is_moving) {
+    loop();
+  }
+  DEBUG_SERIAL.println("Finished testing end servo")
+}
