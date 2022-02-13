@@ -104,18 +104,15 @@ void Base_Servo_Move_Callback() {
     base_is_moving = false;
   }
 }
-
-//void Prepare_Base_Servo_Move_Task(int goal_position) {
-//  if (goal_position > BASE_MAX_PULSE_WIDTH || goal_position < BASE_MIN_PULSE_WIDTH) {
-//    Serial.println("goal_position was invalid in call to Prepare_Base_Servo_Move_Task");
-//  }
-//  T_Base_Servo.setInterval(BASE_DELAY_US);
-//  base_goal_position = goal_position;
-//  Serial.print("Base goal position: "); Serial.println(base_goal_position);
-//  base_move_dir = (base_curr_position > base_goal_position) ? -1 : 1; // -1 for CW, 1 for CCW
-//  base_servo_move_complete = 0;
-//  base_angle_tan = tan(Base_PWM_to_Rad(base_curr_position)); // starting value
-//}
+void Prepare_Base_Servo_Move_Task(int goal_position) {
+ if (goal_position > BASE_MAX_PULSE_WIDTH || goal_position < BASE_MIN_PULSE_WIDTH) {
+   Serial.println("goal_position was invalid in call to Prepare_Base_Servo_Move_Task");
+ }
+ base_goal_position = goal_position;
+ base_move_dir = (base_curr_position > base_goal_position) ? -1 : 1; // -1 for CW, 1 for CCW
+ base_is_moving = true;
+ base_angle_tan = tan(Base_PWM_to_Rad(base_curr_position)); // starting value
+}
 float Base_PWM_to_Rad(int PWM_us) {
   return (((float)PWM_us - BASE_ZERO_POSITION_PULSE_WIDTH)/10)*DEG_TO_RAD;
 }
@@ -201,47 +198,29 @@ void Lin_Act_Move_Callback() {
     LA_curr_position += LA_move_dir;
   }
 }
-//void Prepare_LA_Move_Task(LA_Move_Command LA_cmd) {
-//  //Serial.println("Entered Prepare_LA_Move_Task");
-//  unsigned int goal_position = LA_cmd.goal_position;
-//  if (!LA_Is_Valid_Position(goal_position)) {
-//    Serial.println("goal_position was invalid in call to Prepare_LA_Move_Task");
-//    return;
-//  }
-//  LA_goal_position = goal_position;
-//  Serial.print("Linear Actuator goal position: "); Serial.println(LA_goal_position);
-//  // Need to add velocity bounds check
-//  LA_Set_Dir(goal_position);
-//  float start_vel;
-//  if (LA_cmd.block_place_mode) {
-//    start_vel = BASE_DEFAULT_VEL * (L0 + LA_Pos_mm()) * base_angle_tan;
-//    block_place_mode = true;
-//  }
-//  else {
-//    start_vel = LA_cmd.vel_in_mm_per_sec;
-//    block_place_mode = false;
-//  }
-//  LA_Set_Accel_Parameters(start_vel);
-//  T_Lin_Act.setInterval(LA_curr_pulse_width);
-//  LA_move_complete = 0;
-//  //Serial.println("Finished Prepare_LA_Move_Task");
-//}
-
+void Prepare_LA_Move_Task(LA_Move_Command LA_cmd) {
+ unsigned int goal_position = LA_cmd.goal_position;
+ if (!LA_Is_Valid_Position(goal_position)) {
+   Serial.println("goal_position was invalid in call to Prepare_LA_Move_Task");
+   return;
+ }
+ LA_goal_position = goal_position;
+ // May need to add velocity bounds check
+ LA_Set_Dir(goal_position);
+ if (LA_cmd.block_place_mode) {
+   block_place_mode = true;
+   float vel_to_match = BASE_DEFAULT_VEL * (L0 + LA_Pos_mm()) * base_angle_tan;
+   LA_curr_pulse_width = LA_Vel_To_Pulse_Width(vel_to_match);
+ }
+ else {
+   LA_Set_Accel_Parameters(LA_cmd.vel_in_mm_per_sec);
+   block_place_mode = false;
+ }
+ LA_is_moving = true;
+}
 void LA_Set_Accel_Parameters(float vel_in_mm_per_sec) {
-  LA_is_accelerating = false; // Will be set true if the LA needs to accelerate (unless in block place mode)
-  // If the final velocity will be large, add additional acceleration at the start
-  /* if (block_place_mode && (abs(base_goal_position - 1500) > abs(base_curr_position - 1500))) {
-    float final_vel = BASE_DEFAULT_VEL * (L0 + LA_goal_position/100) * fabs(tan(Base_PWM_to_Rad(base_goal_position)));
-    LA_accel_rate = 1;
-    LA_goal_pulse_width = (unsigned int)((1.0/final_vel)*5000 + 0.5);
-    LA_curr_pulse_width = LA_ACCEL_START_PULSE_WIDTH;
-  } */
-  if (block_place_mode) {
-    // Goal pulse width is not used since it updates over time
-    float vel_to_match = BASE_DEFAULT_VEL * (L0 + LA_Pos_mm()) * base_angle_tan;
-    LA_curr_pulse_width = LA_Vel_To_Pulse_Width(vel_to_match);
-  }
-  else if (vel_in_mm_per_sec > LA_MAX_VEL_NO_ACCEL) {
+  LA_is_accelerating = false; // Will be set true if the LA needs to accelerate
+  if (vel_in_mm_per_sec > LA_MAX_VEL_NO_ACCEL) {
     LA_is_accelerating = true;
     LA_goal_pulse_width = (unsigned int)((1.0/vel_in_mm_per_sec)*5000 + 0.5);
     LA_curr_pulse_width = LA_ACCEL_START_PULSE_WIDTH;
@@ -362,16 +341,14 @@ void End_Servo_Move_Callback() {
     end_is_moving = false;
   }
 }
-//void Prepare_End_Servo_Move_Task(int goal_position) {
-//  if (goal_position > END_MAX_PULSE_WIDTH || goal_position < END_MIN_PULSE_WIDTH) {
-//    Serial.println("goal_position was invalid in call to Prepare_End_Servo_Move_Task");
-//  }
-//  T_End_Servo.setInterval(END_DELAY_US);
-//  end_goal_position = goal_position;
-//  Serial.print("End goal position: "); Serial.println(end_goal_position);
-//  end_move_dir = (end_curr_position > end_goal_position) ? -1 : 1; // -1 for CW, 1 for CCW
-//  end_servo_move_complete = 0;
-//}
+void Prepare_End_Servo_Move_Task(int goal_position) {
+ if (goal_position > END_MAX_PULSE_WIDTH || goal_position < END_MIN_PULSE_WIDTH) {
+   Serial.println("goal_position was invalid in call to Prepare_End_Servo_Move_Task");
+ }
+ end_goal_position = goal_position;
+ end_move_dir = (end_curr_position > end_goal_position) ? -1 : 1; // -1 for CW, 1 for CCW
+ end_is_moving = true;
+}
 float End_PWM_to_Rad(int PWM_us) {
   return (((float)PWM_us - END_ZERO_POSITION_PULSE_WIDTH)/10)*DEG_TO_RAD;
 }
