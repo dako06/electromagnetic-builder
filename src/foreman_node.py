@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
 
+from unittest import result
 import numpy as np
-# import cv2 as cv
-
-import smach
-from smach_ros import SimpleActionState
-from electromagnetic_builder.msg import NavigationFeedback
-from electromagnetic_builder.msg import NavigationResult
-from electromagnetic_builder.msg import NavigationAction
-
 import rospy 
+import smach
+
 # import sys
 # import tf
 # import roslib
@@ -20,29 +15,30 @@ import rospy
 # from nav_msgs.msg import Odometry
 # from geometry_msgs.msg import Twist, Pose2D
 
-
-
-
 from foreman import Foreman
+from action import navi_client
+from action import rprmanip_client
+
+""" global objects used throughout state machine """
+foreman     = Foreman()
+nav_client  = navi_client.NavigationClient()
+rpr_client  = rprmanip_client.ManipulatorClient()
 
 
-# global foreman object to maintain constant features
-foreman = Foreman()
-
-
-""" SMACH state machine functions """
+"""_____SMACH state machine functions_____"""
 
 class initializeBuilder(smach.State):
 
-    """ initial state of build protocal,
-            call initialization functions """
+    """ @note this is the initial state of electromangentic builder
+        initialize objects used throughout build protocal then move on to main transitions """
 
     def __init__(self):
-        # state class initialization 
+        # intialize state class and its outcomes   
         smach.State.__init__(self, outcomes=['initialization_complete', 'startup_failure'])
 
     def execute(self, userdata):
         # call intialization functions
+
         return 'initialization_complete'
 
 
@@ -52,8 +48,9 @@ class evaluateBuildStatus(smach.State):
             continue with build protocal while blueprint contains blocks """
 
     def __init__(self):
-        # state class initialization 
-        smach.State.__init__(self, outcomes=['build_complete', 'build_incomplete'])
+        # intialize state class, outcomes and userdata keys passed during transitions   
+        smach.State.__init__(self, outcomes=['build_complete', 'build_incomplete'],
+                                    output_keys=['eval_nav_req'])
 
     def execute(self, userdata):
 
@@ -69,23 +66,45 @@ class evaluateBuildStatus(smach.State):
             # update current blueprint index to next block 
             foreman.setNextBlockIndex()
             print("Total blocks remaining in blueprint: ", block_sum)
+            
+            # pass input key to navigation state
+            userdata.eval_nav_req = "block_zone"
+
             return 'build_incomplete'
 
 
+class navigateToZone(smach.State):
 
-class navigationGrid(smach.State):
-
-    def __init__(self, outcomes=['build_complete', 'build_incomplete']):
-        # state class initialization 
-        
-        pass
+    def __init__(self):
+        # intialize state class, outcomes and userdata keys passed during transitions   
+        smach.State.__init__(self, outcomes=['arrived','navigation_failure'],
+                                    input_keys=['execute_request'])
 
     def execute(self, userdata):
-        # state execution 
+
+        # call action server to perform navigation based on input key
+        print("executing navigation request to: %s" % userdata.execute_request)
+        result = nav_client.requestNavigation(userdata.execute_request)
+
+        if result:        
+            return 'arrived'
+        else: 
+            return 'navigation_failure'
+
+class extractBlock(smach.State):
+
+    def __init__(self):
+        # intialize state class and its outcomes   
+        smach.State.__init__(self, outcomes=['block_secured', 'extraction_failure'])
+        
+    def execute(self, userdata):
+
+
+        return 'block_secured'
+        # return 'extraction_failure'
+
 
         
-        return 'build_complete'
-
 
 
 def main():
@@ -93,57 +112,46 @@ def main():
     # initialize foreman state machine node
     rospy.init_node('foreman_state_machine', anonymous=True)
 
-
     # Create a SMACH state machine with state machine container outcomes
-    sm = smach.StateMachine(outcomes=['system_shutdown'])
+    sm = smach.StateMachine(outcomes=['construction_complete', 'system_failure'])
 
-    # Open the container
+    # intialize struct field to specify which zone to navigate to
+    sm.userdata.nav_request = "none"
+
+    # open the container
     with sm:
 
-        ''' add states to the sm container '''
+        """ add states to the sm container and specify transitions and I/O keys """
         
         # initial state
         smach.StateMachine.add('INITIALIZE_BUILDER', initializeBuilder(), 
                         transitions={'initialization_complete':'EVALUATE_BUILD_STATUS', 
-                            'startup_failure':'system_shutdown'})
-
+                            'startup_failure':'system_failure'})
 
         smach.StateMachine.add('EVALUATE_BUILD_STATUS', evaluateBuildStatus(),
-                               transitions={'build_complete':'system_shutdown',
-                                    'build_incomplete':'system_shutdown'})
-
-        def goal_callback(userdata, goal):
-            pass
-
-        smach.StateMachine.add('NAVIGATE_TO_ZONE', navigationGrid(), 
-                                transitions={'arrived':'ESTIMATE_BLOCK_CANDIDATE'})
-
-
-        # smach.StateMachine.add('ESTIMATE_BLOCK_CANDIDATE', estimateBlockCandidate(),
-        #                        transitions={'estimate_available':'POSITION_FOR_EXTRACTION', })
-        #                             # 'outcome2':'outcome4'})
-
-        # smach.StateMachine.add('POSITION_FOR_EXTRACTION', setExtractionPose(),
-        #                        transitions={'extraction_pose_achieved':'BLOCK_EXTRACTION', })
-        #                             # 'outcome2':'outcome4'})
-
-        # smach.StateMachine.add('BLOCK_EXTRACTION', extractBlock(),
-        #                        transitions={'block_secured':'system_shutdown', })
-        #                             # 'outcome2':'outcome4'})
+                               transitions={'build_incomplete':'NAVIGATE_TO_ZONE',
+                                    'build_complete':'construction_complete'},
+                                remapping={'eval_nav_req':'nav_request'})
+        
+        smach.StateMachine.add('NAVIGATE_TO_ZONE', navigateToZone(), 
+                                transitions={'arrived':'EXTRACT_BLOCK',
+                                            'navigation_failure':'system_failure'},
+                                remapping={'execute_request':'nav_request'})
 
 
+        smach.StateMachine.add('EXTRACT_BLOCK', extractBlock(),
+                               transitions={'block_secured':'construction_complete', 
+                                            'extraction_failure':'system_failure'})
+                                # remapping={'extraction_nav_req':'nav_request'})
+   
 
-    
-    
+
     # execute SMACH 
     outcome = sm.execute()
     
 if __name__ == '__main__':
 
     main()
-    
-
-    # print('Initialization of Foreman controller is complete.')
     
 
     # try:
@@ -158,12 +166,11 @@ if __name__ == '__main__':
     #     print("Shutting Down")
 
 
-    # class state(smach.State):
+# class state(smach.State):
 
 #     def __init__(self, outcomes=['outcome1', 'outcome2']):
 #         # state class initialization 
         
-
 #     def execute(self, userdata):
 #         # Your state execution goes here
         

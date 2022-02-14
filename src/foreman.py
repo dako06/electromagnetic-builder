@@ -30,7 +30,7 @@ class Foreman:
 
         #### blueprint object ####
         # file path to raw blueprint excel file
-        self.fpath_blueprint_xlsx = '~/catkin_ws/src/electromagnetic-builder/blueprint_raw.xlsx'
+        self.fpath_blueprint_xlsx = '~/catkin_ws/src/electromagnetic_builder/blueprint_raw.xlsx'
 
         # create blueprint object
         self.blueprint = self.createBlueprint(self.fpath_blueprint_xlsx)

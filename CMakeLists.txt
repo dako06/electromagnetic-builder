@@ -69,6 +69,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_action_files(
   DIRECTORY action
   FILES Navigation.action
+  FILES RPRManipulator.action
   # Action1.action
   # Action2.action
 )
