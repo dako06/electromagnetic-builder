@@ -142,8 +142,6 @@ def main():
         smach.StateMachine.add('EXTRACT_BLOCK', extractBlock(),
                                transitions={'block_secured':'construction_complete', 
                                             'extraction_failure':'system_failure'})
-                                # remapping={'extraction_nav_req':'nav_request'})
-   
 
 
     # execute SMACH 
