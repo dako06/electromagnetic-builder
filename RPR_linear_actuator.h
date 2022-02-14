@@ -13,6 +13,7 @@
 //#define LA_MIN_PULSE_WIDTH 350
 #define LA_MIN_PULSE_WIDTH 200
 #define LA_MAX_PULSE_WIDTH 1000
+#define LA_HOMING_PULSE_WIDTH 625
 #define LA_ACCEL_START_PULSE_WIDTH 625 // LA_MAX_VEL_NO_ACCEL converted to pulse width
 #define LA_MAX_VEL_NO_ACCEL 8 // The maximum velocity that the linear actuator can begin moving to from rest, in mm/s
 #define LA_DEFAULT_ACCEL_RATE 1
@@ -39,9 +40,15 @@ void LA_Set_Accel_Parameters(float vel_in_mm_per_sec);
 float LA_Pos_mm();
 unsigned int LA_Vel_To_Pulse_Width(float vel_in_mm_per_sec);
 
+typedef enum {
+  DEFAULT_MODE,
+  BLOCK_PLACE_MODE,
+  HOMING_MODE
+} LA_Move_Mode;
+
 struct LA_Move_Command {
   unsigned int goal_position;
-  bool block_place_mode;
+  LA_Move_Mode move_mode;
   float vel_in_mm_per_sec;
 };
 

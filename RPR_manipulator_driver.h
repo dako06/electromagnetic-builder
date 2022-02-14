@@ -12,6 +12,25 @@
 
 #define QUEUE_MAX_SIZE 10
 
+/* Things to make defining Arm_Move_Command structs easier */
+// Adds in the appropriate boolean array to specify which joints to move
+#define BASE_ONLY {1,0,0}
+#define LA_ONLY {0,1,0}
+#define END_ONLY {0,0,1}
+#define ALL_JOINTS {1,1,1}
+// Adds in an empty LA_Move_Command when the command will not involve the linear actuator moving
+#define LA_NO_MOVE_CMD {0,DEFAULT_MODE,0}
+// Command to use when homing the linear actuator
+#define HOMING_CMD {LA_ONLY,0,{0,HOMING_MODE,0},0}
+// Template Arm_Move_Command that initializes everything to default values so that
+  // only the members which are changed need to be specified
+#define LA_MAVE_CMD_INIT(...) {.joints_to_move = {0,0,0}, \
+                               .base_cmd = 0, \
+                               .LA_cmd = LA_NO_MOVE_CMD, \
+                               .end_cmd = 0, \
+                               __VA_ARGS__}
+
+
 struct Arm_Move_Command {
   bool joints_to_move [3];
   int base_cmd;
@@ -23,11 +42,13 @@ ArduinoQueue<Arm_Move_Command> Arm_Move_Queue(QUEUE_MAX_SIZE);
 
 /****** High-level arm motion functions ******/
 void Prepare_Arm_Motion(Arm_Move_Command cmd);
+void Queue_Return_To_Home();
 void Go_To_Home(); // Being replaced
-//void Start_Next_Motion(); // Being replaced
 void Queue_Pick_Up_Block(float block_x, float block_z);
 void Queue_Simple_Move_To_Position(float goal_x, float goal_z);
 /****** Test functions ******/
-void Test_Joints();
+void Test_Base();
+void Test_LA();
+void Test_End();
 
 #endif 

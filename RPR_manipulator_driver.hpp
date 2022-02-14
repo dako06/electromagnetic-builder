@@ -150,6 +150,16 @@ void Init_Linear_Actuator() {
   block_place_mode = false;
 }
 
+void Start_LA_Homing() {
+  if (base_is_moving || LA_is_moving || end_is_moving) {
+    Serial.println("Could not execute homing, another motion task is currently in progress");
+    return;
+  }
+  LA_Retract();
+  LA_is_homing = true;
+  LA_is_moving = true;
+  LA_curr_pulse_width = LA_HOMING_PULSE_WIDTH;
+}
 void Homing_Callback() {
   // Keep moving the linear actuator backwards until it trips the homing switch
   // We do not track steps here because the final position that the linear actuator
@@ -160,25 +170,11 @@ void Homing_Callback() {
     LA_curr_position = 0; 
     LA_is_homing = false;
     LA_is_moving = false;
-    return;
   }
   else {
     LA_Toggle_Step_Pin();
   }
 }
-
-// Bring the linear actuator back until it trips the homing limit switch
-/* void Start_LA_Homing() {
-  if (T_Base_Servo.isEnabled() || T_Lin_Act.isEnabled() || T_End_Servo.isEnabled()) {
-    Serial.println("Could not execute homing, another motion task is currently enabled");
-  }
-  else {
-    Serial.println("Begin homing");
-  }
-  LA_Retract();
-  LA_move_complete = 0;
-  T_Homing.restart();
-} */
 
 void Lin_Act_Move_Callback() {
   // Check for out-of-bounds motion
@@ -204,10 +200,14 @@ void Prepare_LA_Move_Task(LA_Move_Command LA_cmd) {
    Serial.println("goal_position was invalid in call to Prepare_LA_Move_Task");
    return;
  }
+ if (LA_cmd.move_mode == HOMING_MODE) {
+   Start_LA_Homing();
+   return;
+ }
  LA_goal_position = goal_position;
  // May need to add velocity bounds check
  LA_Set_Dir(goal_position);
- if (LA_cmd.block_place_mode) {
+ if (LA_cmd.move_mode == BLOCK_PLACE_MODE) {
    block_place_mode = true;
    float vel_to_match = BASE_DEFAULT_VEL * (L0 + LA_Pos_mm()) * base_angle_tan;
    LA_curr_pulse_width = LA_Vel_To_Pulse_Width(vel_to_match);
@@ -373,55 +373,51 @@ void Prepare_Arm_Motion(Arm_Move_Command cmd) {
   }
 }
 
-//void Go_To_Home() {
-//  Serial.println("Waiting for signal to return to home");
-//  while(!Serial.available());
-//  Serial.read();
-//  bool base_done = false;
-//  bool LA_done = false;
-//  bool end_done = false;
-//  if (base_curr_position != BASE_ZERO_POSITION_PULSE_WIDTH) {
-//    Prepare_Base_Servo_Move_Task(BASE_ZERO_POSITION_PULSE_WIDTH);
-//  }
-//  else {
-//    base_done = true;
-//  }
-//  if (LA_curr_position != SAFETY_BUFFER_STEPS) {
-//    Prepare_LA_Move_Task({SAFETY_BUFFER_STEPS, false, 5});
-//  }
-//  else {
-//    LA_done = true;
-//  }
-//  if (end_curr_position != END_ZERO_POSITION_PULSE_WIDTH) {
-//    Prepare_End_Servo_Move_Task(END_ZERO_POSITION_PULSE_WIDTH);
-//  }
-//  else {
-//    end_done = true;
-//  }
-//  if (base_done && LA_done && end_done) {
-//    Serial.println("All done");
-//    while(1);
-//  }
-//  T_Base_Servo.restart();
-//  T_Lin_Act.restart();
-//  T_End_Servo.restart();
-//}
+void Queue_Return_To_Home() {
+  Arm_Move_Command go_home = {{1,1,1},BASE_ZERO_POSITION_PULSE_WIDTH,{0,DEFAULT_MODE,LA_MAX_VEL_NO_ACCEL},END_ZERO_POSITION_PULSE_WIDTH};
+  Arm_Move_Queue.enqueue(go_home); 
+}
 
+// Bring the linear actuator back until it trips the homing limit switch
+void Queue_LA_Homing() {
+
+}
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*********************************** Test functions **********************************************************/
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/*
-void Test_Joints() {
+// These functions queue specific motions in order to test functions of the arm
+void Test_Base() {
   // Test range of motion for base servo
-  base_goal_position = BASE_MAX_PULSE_WIDTH;
-  base_is_moving = true;
-  while(base_is_moving) {
-    loop();
-  }
-  base_goal_position = BASE_MIN_PULSE_WIDTH;
-  base_is_moving = true;
-  while(base_is_moving) {
-    loop();
-  }
-  DEBUG_SERIAL.println("Finished testing base servo");
-}*/
+  Arm_Move_Command test_max_angle = {BASE_ONLY,BASE_MAX_PULSE_WIDTH,LA_NO_MOVE_CMD,0};
+  Arm_Move_Queue.enqueue(test_max_angle);
+  Arm_Move_Command test_min_angle = {BASE_ONLY,BASE_MIN_PULSE_WIDTH,LA_NO_MOVE_CMD,0};
+  Arm_Move_Queue.enqueue(test_min_angle);
+  Queue_Return_To_Home();
+}
+void Test_LA() {
+  // Test independent movement for the linear actuator
+  // Command movement at a low speed such that the linear actuator does not accelerate
+  Arm_Move_Command test_forwards_no_accel = {LA_ONLY,0,{5000,DEFAULT_MODE,LA_MAX_VEL_NO_ACCEL},0};
+  Arm_Move_Queue.enqueue(test_forwards_no_accel);
+  Arm_Move_Command test_reverse_no_accel = {LA_ONLY,0,{0,DEFAULT_MODE,LA_MAX_VEL_NO_ACCEL},0};
+  Arm_Move_Queue.enqueue(test_reverse_no_accel);
+  // Command movement at 12 mm/s, which is above the max speed that the linear actuator can achieve from 
+    // rest without taking time to accelerate
+  Arm_Move_Command test_forwards_with_accel = {LA_ONLY,0,{5000,DEFAULT_MODE,12},0};
+  Arm_Move_Queue.enqueue(test_forwards_with_accel);
+  Arm_Move_Command test_reverse_with_accel = {LA_ONLY,0,{0,DEFAULT_MODE,12},0};
+  Arm_Move_Queue.enqueue(test_reverse_with_accel);
+  // Test homing the linear actuator
+  Arm_Move_Command move_forwards = {LA_ONLY,0,{2000,DEFAULT_MODE,LA_MAX_VEL_NO_ACCEL},0};
+  Arm_Move_Queue.enqueue(move_forwards);
+  Arm_Move_Command test_homing = HOMING_CMD;
+  Arm_Move_Queue.enqueue(test_homing);
+}
+void Test_End() {
+  // Test range of motion for base servo
+  Arm_Move_Command test_max_angle = {END_ONLY,0,LA_NO_MOVE_CMD,END_MAX_PULSE_WIDTH};
+  Arm_Move_Queue.enqueue(test_max_angle);
+  Arm_Move_Command test_min_angle = {END_ONLY,0,LA_NO_MOVE_CMD,END_MIN_PULSE_WIDTH};
+  Arm_Move_Queue.enqueue(test_min_angle);
+  Queue_Return_To_Home();
+}
