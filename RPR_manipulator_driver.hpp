@@ -372,15 +372,14 @@ void Prepare_Arm_Motion(Arm_Move_Command cmd) {
     Prepare_End_Servo_Move_Task(cmd.end_cmd);
   }
 }
-
 void Queue_Return_To_Home() {
-  Arm_Move_Command go_home = {{1,1,1},BASE_ZERO_POSITION_PULSE_WIDTH,{0,DEFAULT_MODE,LA_MAX_VEL_NO_ACCEL},END_ZERO_POSITION_PULSE_WIDTH};
+  Arm_Move_Command go_home = GO_HOME_CMD;
   Arm_Move_Queue.enqueue(go_home); 
 }
-
 // Bring the linear actuator back until it trips the homing limit switch
 void Queue_LA_Homing() {
-
+  Arm_Move_Command test_homing = HOMING_CMD;
+  Arm_Move_Queue.enqueue(test_homing);
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*********************************** Test functions **********************************************************/
@@ -410,8 +409,7 @@ void Test_LA() {
   // Test homing the linear actuator
   Arm_Move_Command move_forwards = {LA_ONLY,0,{2000,DEFAULT_MODE,LA_MAX_VEL_NO_ACCEL},0};
   Arm_Move_Queue.enqueue(move_forwards);
-  Arm_Move_Command test_homing = HOMING_CMD;
-  Arm_Move_Queue.enqueue(test_homing);
+  Queue_LA_Homing();
 }
 void Test_End() {
   // Test range of motion for base servo
