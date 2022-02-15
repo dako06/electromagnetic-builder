@@ -5,6 +5,8 @@ from electromagnetic_builder.msg import RPRManipulatorFeedback
 from electromagnetic_builder.msg import RPRManipulatorResult
 from electromagnetic_builder.msg import RPRManipulatorAction
 
+from std_msgs.msg import Float64MultiArray
+
 
 class ManipulatorActionServer(object):
     
@@ -18,9 +20,22 @@ class ManipulatorActionServer(object):
         self.action_server = SimpleActionServer(self.action_name, RPRManipulatorAction, execute_cb=self.execute_callback, auto_start = False)
         self.action_server.start()
 
+        # publish commands to RPR module on openCR
+        self.linear_actuator_pub = rospy.Publisher("la_joint_trajectory_point", Float64MultiArray, queue_size=10)
+        self.servo_pub = rospy.Publisher("servo_joint_trajectory_point", Float64MultiArray, queue_size=10)
+
+
         #### action messages ####
         self.result     = RPRManipulatorResult()
         self.feedback   = RPRManipulatorFeedback()
+
+        self.goal_LA = Float64MultiArray()
+        self.goal_servo = Float64MultiArray()
+
+
+
+
+        
 
     def execute_callback(self, goal):
         

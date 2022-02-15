@@ -1,7 +1,18 @@
+#!/usr/bin/env python3
+
+import rospy
 
 import pandas as pd
 import numpy as np
 from numpy import linalg
+
+
+from actionlib import SimpleActionClient 
+
+from electromagnetic_builder.msg import NavigationGoal
+from electromagnetic_builder.msg import NavigationAction
+from electromagnetic_builder.msg import NavigationResult
+
 
 DEBUG = 1
 
@@ -9,6 +20,9 @@ class Foreman:
 
 
     def __init__(self):  
+
+        # initialize navigation client
+        self.client = SimpleActionClient('navigation_action', NavigationAction)
 
         #### CONSTANTS ####
         self.ROW_MAX = 5
@@ -107,22 +121,48 @@ class Foreman:
 
         self.current_block_xy = (x, y)
 
+    def requestNavigation(self, zone):
+        """ @note request grid navigation from navigation server """
 
-    # ODOM
-    # def odomCallback(self, msg):
-    #     # get pose = (x, y, theta) from odometry topic
-    #     quarternion = [msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,\
-    #                 msg.pose.pose.orientation.z, msg.pose.pose.orientation.w]
-    #     (roll, pitch, yaw) = tf.transformations.euler_from_quaternion(quarternion)
-    #     self.pose.theta = yaw
-    #     self.pose.x = msg.pose.pose.position.x
-    #     self.pose.y = msg.pose.pose.position.y   
+        # wait for server to prepare for goals
+        self.client.wait_for_server()    
 
-        # # reset odometry to zero
-        # self.reset_pub = rospy.Publisher("mobile_base/commands/reset_odometry", Empty, queue_size=10)
-        # for i in range(10):
-        #     self.reset_pub.publish(Empty())
-        #     self.rate.sleep()
+        # final_result = NavigationResult()
+
+        # intialize goal data type
+        nav_goal = NavigationGoal()
+
+        if zone == "shimmy":
+            nav_goal.x = 0
+            nav_goal.y = 0
+            nav_goal.command = "shimmy"
+        else:
+
+            nav_goal.command = "grid_navigation"
+            
+            if zone == 'blockzone':
+                nav_goal.x = 1
+                nav_goal.y = 1
+            elif zone =='buildzone':
+                nav_goal.x = 5
+                nav_goal.y = 4
+        
+        # send goal to action server and wait for completion
+        self.client.send_goal(nav_goal) 
+        self.client.wait_for_result()
+
+        # get result from server
+        action_result = self.client.get_result()
+
+        # return result to state machine
+        return action_result
+
+
+
+################## EOF ################## 
+
+
+
         
 
     # camera feed

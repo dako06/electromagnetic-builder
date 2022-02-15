@@ -1,9 +1,10 @@
 #goal definition
 float64 x
 float64 y
+string command
 ---
 #result definition
 bool arrived
 ---
 #feedback
-float32 pct_complete
+float32 percent_complete

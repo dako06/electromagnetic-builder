@@ -6,6 +6,9 @@ from actionlib import SimpleActionClient
 from electromagnetic_builder.msg import RPRManipulatorGoal
 from electromagnetic_builder.msg import RPRManipulatorAction
 
+# from sensor_msgs.msg import JointState
+
+
 class ManipulatorClient():
 
     """ @note This class contains the action client for the RPR manipulator server
@@ -15,6 +18,8 @@ class ManipulatorClient():
 
         # initialize client
         self.client = SimpleActionClient('rpr_manip_action', RPRManipulatorAction)
+
+
 
     def requestManipulatorAction(self):
 
@@ -34,3 +39,5 @@ class ManipulatorClient():
 
         # return result to state machine
         return action_result
+
+

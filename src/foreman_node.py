@@ -17,12 +17,12 @@ import smach
 
 from foreman import Foreman
 from action import navi_client
-from action import rprmanip_client
+from action import rpr_manip_client
 
 """ global objects used throughout state machine """
 foreman     = Foreman()
-nav_client  = navi_client.NavigationClient()
-rpr_client  = rprmanip_client.ManipulatorClient()
+# nav_client  = navi_client.NavigationClient()
+rpr_client  = rpr_manip_client.ManipulatorClient()
 
 
 """_____SMACH state machine functions_____"""
@@ -84,7 +84,7 @@ class navigateToZone(smach.State):
 
         # call action server to perform navigation based on input key
         print("executing navigation request to: %s" % userdata.execute_request)
-        result = nav_client.requestNavigation(userdata.execute_request)
+        result = foreman.requestNavigation(userdata.execute_request)
 
         if result:        
             return 'arrived'
