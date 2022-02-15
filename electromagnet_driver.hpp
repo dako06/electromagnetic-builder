@@ -1,18 +1,29 @@
-#include "electromagnet_driver.h"
+#ifndef ELECTROMAGNET_DRIVER_
+#define ELECTROMAGNET_DRIVER_
 
 
-/** @note this function is used to initialize the electromagnet driver
-*/
-//void solenoid_Driver::initializeSolenoid()
-//{
-//    pinMode(SOLENOIDPIN, OUTPUT);
-//}
-//
-//
-///** @note this function is used to energize the electromagnet
-//*/
-//void solenoid_Driver::solenoidState()
-//{
-//    digitalWrite(SOLENOIDPIN, HIGH);
-//
-//}
+// #define SOLENOIDPIN 3
+
+// class solenoid_Driver {
+
+// public:
+//     solenoid_Driver();
+//     ~solenoid_Driver();
+    
+//     void initializeSolenoid()
+//     {
+//       pinMode(SOLENOIDPIN, OUTPUT);
+//     }
+    
+//     void solenoidState()
+//     {
+//       digitalWrite(SOLENOIDPIN, HIGH);
+//     }
+
+// private:
+
+
+// };
+
+
+#endif

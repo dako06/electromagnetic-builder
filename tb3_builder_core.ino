@@ -22,6 +22,9 @@ void setup()
   nh.subscribe(sound_sub);
   nh.subscribe(motor_power_sub);
   nh.subscribe(reset_sub);
+  
+  // builder: publisher for rpr joint states
+  nh.advertise(rpr_joint_states_pub);
 
   nh.advertise(sensor_state_pub);  
   nh.advertise(version_info_pub);
@@ -56,10 +59,16 @@ void setup()
 
   initJointStates();
 
+  // builder: intialize the RPR joint states message used for publishing
+  initRPRJointStates();
+
+  // builder: joint test function
+  Test_Base();
+  Test_LA();
+  Test_End();
+
   prev_update_time = millis();
-
   pinMode(LED_WORKING_CHECK, OUTPUT);
-
   setup_end = true;
 }
 
@@ -132,6 +141,7 @@ void loop()
   if ((t-tTime[6]) >= (1000 / SERVO_CONTROL_FREQEUNCY))
   {
     servoJointControl(); // TODO jeremy: edit function call to acuate servos every period
+    publishRPRJointState();
     tTime[6] = t;
   
   }
@@ -187,28 +197,18 @@ void loop()
 
   // Wait the serial link time to process
   waitForSerialLink(nh.connected());
-}
 
-/*******************************************************************************
-* Callback function for cmd_vel msg
-*******************************************************************************/
-void commandVelocityCallback(const geometry_msgs::Twist& cmd_vel_msg)
-{
-  goal_velocity_from_cmd[LINEAR]  = cmd_vel_msg.linear.x;
-  goal_velocity_from_cmd[ANGULAR] = cmd_vel_msg.angular.z;
+} /* end software timer loop */
 
-  goal_velocity_from_cmd[LINEAR]  = constrain(goal_velocity_from_cmd[LINEAR],  MIN_LINEAR_VELOCITY, MAX_LINEAR_VELOCITY);
-  goal_velocity_from_cmd[ANGULAR] = constrain(goal_velocity_from_cmd[ANGULAR], MIN_ANGULAR_VELOCITY, MAX_ANGULAR_VELOCITY);
-  // tTime[6] = millis(); TODO confirm this is okay being commented out
-}
 
-/* TODO confirm these callback fucntion definitions are properly set 
-  based on our custom drivers ..... */
+/************************************************************************************/
+/****************** electromagnetic builder function definitions ********************/
+/************************************************************************************/
 
-/*******************************************************************************
-* Callback function for RPR linear actuator goal msg
-*******************************************************************************/
-void LAJointCallback(const std_msgs::Float64MultiArray& LA_joint_msg)
+/** @param linear_actuator_joint_msg - message containing coordinates for linear actuator to execute
+ *  @note callback function to respond to movement commands from the remote PC  */
+
+void LAJointCallback(const std_msgs::Float64MultiArray& linear_actuator_joint_msg)
 {
   // if (is_moving == false)
   // {
@@ -217,12 +217,12 @@ void LAJointCallback(const std_msgs::Float64MultiArray& LA_joint_msg)
   // }
 
   // TODO complete call back
-//  la_goal_point = LA_joint_msg;
+//  la_goal_point = linear_actuator_joint_msg;
 }
 
-/*******************************************************************************
-* Callback function for RPR base/end servo goal msg
-*******************************************************************************/
+/** @param servo_msg - message containing coordinates for base and end servo to execute
+ *  @note callback function to respond to movement commands from the remote PC  */
+
 void servoJointCallback(const std_msgs::Float64MultiArray& servo_msg)
 {
   // double goal_gripper_position[5] = {0.0, };
@@ -237,9 +237,102 @@ void servoJointCallback(const std_msgs::Float64MultiArray& servo_msg)
 //  servo_goal_point = servo_msg;  
 }
 
+/** @note function called in software timer to handle direct actuator movement */
 
-// .... continue
+void LAJointControl(void)
+{
+  if (LA_is_moving) {
+    if (LA_is_homing) {
+      Homing_Callback();
+    }
+    else {
+      Lin_Act_Move_Callback();
+    }
+  }
+}
 
+/** @note function called in software timer to direct base/end servo movement */
+
+void servoJointControl(void)
+{
+  // base_is_moving is set true by whatever starts moving the arm, and is set
+    // false inside of Base_Servo_Move_Callback
+  if (base_is_moving) {
+    Base_Servo_Move_Callback();
+  }
+  // end_is_moving is set true by whatever starts moving the arm, and is set
+    // false inside of End_Servo_Move_Callback
+  if (end_is_moving) {
+    End_Servo_Move_Callback();
+  }
+
+}
+
+/** @note this function intializes the joint state message for adjustment throughout execution */
+
+void  initRPRJointStates()
+{
+  static char *rpr_joint_states_name[] = {"BASE_SERVO", "LINEAR_ACTUATOR", "END_SERVO"}; 
+  rpr_joint_states.name = rpr_joint_states_name;
+  rpr_joint_states.name_length = 3;
+  rpr_joint_states.position_length = 3;
+  rpr_joint_states.velocity_length = 3;
+  rpr_joint_states.effort_length = 3;
+
+}
+
+/** @note this function publish the joint state message to the remote pc */
+
+void publishRPRJointState()
+{
+  ros::Time stamp_now = rosNow();
+  rpr_joint_states.header.stamp = stamp_now;
+  rpr_joint_states_pub.publish(&rpr_joint_states);
+}
+
+/** @note this function sets the joint state message for the rpr manipulator to prepare for publishing */
+
+void setRPRJointState()
+{
+  // assign values to msg fields
+  // rpr_joint_states.position = ;
+  // rpr_joint_states.velocity = ;
+  // rpr_joint_states.effort = ;
+
+  // prepare updates for each field
+  static float rpr_joint_states_pos[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
+  static float rpr_joint_states_vel[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
+  //static float joint_states_eff[RPR_JOINT_NUM] = {0.0, 0.0};
+
+  // temp hard coded for test
+  rpr_joint_states_pos[0] = 1.0;
+  rpr_joint_states_pos[1] = 2.0;
+  rpr_joint_states_pos[2] = 3.0;
+
+  rpr_joint_states_vel[0] = 1.0;
+  rpr_joint_states_vel[1] = 2.0;
+  rpr_joint_states_vel[2] = 3.0;
+
+  joint_states.position = rpr_joint_states_pos;
+  joint_states.velocity = rpr_joint_states_vel;
+}
+
+
+/********* turtlebot3 waffle pi function defintions ******************/
+
+
+/*******************************************************************************
+* Callback function for cmd_vel msg
+*******************************************************************************/
+void commandVelocityCallback(const geometry_msgs::Twist& cmd_vel_msg)
+{
+  goal_velocity_from_cmd[LINEAR]  = cmd_vel_msg.linear.x;
+  goal_velocity_from_cmd[ANGULAR] = cmd_vel_msg.angular.z;
+
+  goal_velocity_from_cmd[LINEAR]  = constrain(goal_velocity_from_cmd[LINEAR],  MIN_LINEAR_VELOCITY, MAX_LINEAR_VELOCITY);
+  goal_velocity_from_cmd[ANGULAR] = constrain(goal_velocity_from_cmd[ANGULAR], MIN_ANGULAR_VELOCITY, MAX_ANGULAR_VELOCITY);
+  // tTime[6] = millis(); TODO confirm this is okay being commented out
+}
 
 /*******************************************************************************
 * Callback function for sound msg
@@ -509,43 +602,6 @@ void updateJointStates(void)
   joint_states.position = joint_states_pos;
   joint_states.velocity = joint_states_vel;
 
-  // TODO confirm if the below code is needed or supported based on our drivers
-  // static float joint_states_pos[20] = {0.0, };
-  // static float joint_states_vel[20] = {0.0, };
-  // static float joint_states_eff[20] = {0.0, };
-
-  // const double OPEN_MANIPULATOR_GRIPPER_OFFSET = -0.015f;
-
-  // double get_joint_position[joint_cnt + gripper_cnt];
-  // double get_joint_velocity[joint_cnt + gripper_cnt];
-  // double get_joint_current[joint_cnt + gripper_cnt];
-
-  // manipulator_driver.syncReadDynamixelInfo();
-  // manipulator_driver.getPosition(get_joint_position);
-  // manipulator_driver.getVelocity(get_joint_velocity);
-  // manipulator_driver.getCurrent(get_joint_current);
-
-  // joint_states_pos[LEFT]  = last_rad[LEFT];
-  // joint_states_pos[RIGHT] = last_rad[RIGHT];
-
-  // joint_states_vel[LEFT]  = last_velocity[LEFT];
-  // joint_states_vel[RIGHT] = last_velocity[RIGHT];
-
-  // for (uint8_t num = 0; num < (joint_cnt + gripper_cnt); num++)
-  // {
-  //   if (num >= joint_cnt)
-  //     get_joint_position[num] = get_joint_position[num] * OPEN_MANIPULATOR_GRIPPER_OFFSET;
-
-  //   joint_states_pos[WHEEL_NUM + num] = get_joint_position[num];
-  //   joint_states_vel[WHEEL_NUM + num] = get_joint_velocity[num];
-  //   joint_states_eff[WHEEL_NUM + num] = get_joint_current[num];
-  // }
-
-  // joint_states.position = joint_states_pos;
-  // joint_states.velocity = joint_states_vel;
-  // joint_states.effort = joint_states_eff;
-
-
 }
 
 /*******************************************************************************
@@ -659,99 +715,6 @@ bool calcOdometry(double diff_time)
 
   return true;
 }
-
-/*******************************************************************************
-* RPR manipulator's joint control
-*******************************************************************************/
-void LAJointControl(void)
-{
-  // TODO jeremy: implement linear actual joint control here, this is called in software loop each period
-  
-  if (LA_is_moving) {
-    if (LA_is_homing) {
-      Homing_Callback();
-    }
-    else {
-      Lin_Act_Move_Callback();
-    }
-  }
-}
-
-// TODO for reference of openmanip impl remove if not needed
-  // const uint8_t POINT_SIZE = joint_cnt + 1; // Add time parameter
-  // const double JOINT_CONTROL_PERIOD = 1.0f / (double)JOINT_CONTROL_FREQEUNCY;
-//   static uint8_t wait_for_write = 0;
-//   static uint8_t loop_cnt = 0;
-//   if (is_moving == true)
-//   {
-//     uint32_t all_points_cnt = joint_trajectory_point.data_length;
-//     uint8_t write_cnt = 0;
-//     if (loop_cnt < (wait_for_write))
-//     {
-//       loop_cnt++;
-//       return;
-//     }
-//     else
-//     {
-//       double goal_joint_position[joint_cnt];
-//       double move_time = 0.0f;
-//       if (points == 0) move_time = joint_trajectory_point.data[points + POINT_SIZE] - joint_trajectory_point.data[points];
-//       else if ((points + POINT_SIZE) >= all_points_cnt) move_time = joint_trajectory_point.data[points] / 2.0f;
-//       else  move_time = joint_trajectory_point.data[points] - joint_trajectory_point.data[points - POINT_SIZE];
-//       for (uint32_t positions = points + 1; positions < (points + POINT_SIZE); positions++)
-//       {        
-//         if ((points + POINT_SIZE) >= all_points_cnt)
-//         {
-//           goal_joint_position[write_cnt] = joint_trajectory_point.data[positions];
-//         }
-//         else
-//         {
-//           double offset = 2.0f * (joint_trajectory_point.data[positions + POINT_SIZE] - joint_trajectory_point.data[positions]);
-//           goal_joint_position[write_cnt] = joint_trajectory_point.data[positions] + offset;
-//         }
-//         write_cnt++;
-//       }
-//       manipulator_driver.writeJointProfileControlParam(move_time * 2.0f);
-//       manipulator_driver.writeJointPosition(goal_joint_position);
-//       wait_for_write = move_time / JOINT_CONTROL_PERIOD;
-//       points = points + POINT_SIZE;
-//       if (points >= all_points_cnt)
-//       {
-//         points = 0;
-//         wait_for_write = 0;
-//         is_moving = false;
-//       }
-//       else
-//       {
-//         loop_cnt = 0;
-//       }
-//     }
-//   }
-// }
-
-void servoJointControl(void)
-{
-  /* TODO jeremy: implement base/end servo joint control here, 
-    this is called in software loop each period */
-
-  // base_is_moving is set true by whatever starts moving the arm, and is set
-    // false inside of Base_Servo_Move_Callback
-  if (base_is_moving) {
-    Base_Servo_Move_Callback();
-  }
-  // end_is_moving is set true by whatever starts moving the arm, and is set
-    // false inside of End_Servo_Move_Callback
-  if (end_is_moving) {
-    End_Servo_Move_Callback();
-  }
-
-}
-
-
-/*******************************************************************************
-* Electromagnet's control
-*******************************************************************************/
-// TODO electromagnet control function here
 
 
 /*******************************************************************************
