@@ -25,6 +25,7 @@ void setup()
   
   // builder: publisher for rpr joint states
   nh.advertise(rpr_joint_states_pub);
+  nh.advertise(joint_debug_pub);
 
   nh.advertise(sensor_state_pub);  
   nh.advertise(version_info_pub);
@@ -61,11 +62,12 @@ void setup()
 
   // builder: intialize the RPR joint states message used for publishing
   initRPRJointStates();
+  initJointDebug();
 
   // builder: joint test function
   Test_Base();
-  Test_LA();
-  Test_End();
+//  Test_LA();
+//  Test_End();
 
   prev_update_time = millis();
   pinMode(LED_WORKING_CHECK, OUTPUT);
@@ -135,15 +137,24 @@ void loop()
   }
 #endif
 
+  // If there is a move command in the queue and the arm is not currently moving,
+    // start the next motion
+  if (!(base_is_moving || LA_is_moving || end_is_moving)) {
+    if (!Arm_Move_Queue.isEmpty()) {
+      Prepare_Arm_Motion(Arm_Move_Queue.dequeue());
+    }
+  }
+
   /* builder: statement executes at 90 ms
       function call executes control of base and end servo of the RPR manipulator */ 
       // Maybe we should replace the statement on the right side of the comparison with a single integer
-  if ((t-tTime[6]) >= (1000 / SERVO_CONTROL_FREQEUNCY))
+  if ((t-tTime[6]) >= 90) //(1000 / SERVO_CONTROL_FREQEUNCY))
   {
-    servoJointControl(); // TODO jeremy: edit function call to acuate servos every period
+    servoJointControl(); 
+    setRPRJointState();
     publishRPRJointState();
+
     tTime[6] = t;
-  
   }
 
   /* builder: running at 10 micros (1000000 micros = 1s)  
@@ -154,13 +165,14 @@ void loop()
     tTimeMicros[0] = t_micros;
   }
 
-  // If there is a move command in the queue and the arm is not currently moving,
-    // start the next motion
-  if (!(base_is_moving || LA_is_moving || end_is_moving)) {
-    if (!Arm_Move_Queue.isEmpty()) {
-      Prepare_Arm_Motion(Arm_Move_Queue.dequeue());
-    }
+  if ((t-tTime[7]) >= 50)
+  {
+    setJointDebugMsg();
+    publishJointDebug();
+    tTime[7] = t;
   }
+
+
 
   // Send log message after ROS connection
   sendLogMsg();
@@ -279,6 +291,13 @@ void  initRPRJointStates()
   rpr_joint_states.velocity_length = 3;
   rpr_joint_states.effort_length = 3;
 
+  
+  float rpr_joint_states_pos[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
+  float rpr_joint_states_vel[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
+
+  rpr_joint_states.position = rpr_joint_states_pos;
+  rpr_joint_states.velocity = rpr_joint_states_vel;
+
 }
 
 /** @note this function publish the joint state message to the remote pc */
@@ -294,27 +313,66 @@ void publishRPRJointState()
 
 void setRPRJointState()
 {
-  // assign values to msg fields
-  // rpr_joint_states.position = ;
-  // rpr_joint_states.velocity = ;
-  // rpr_joint_states.effort = ;
-
+ 
   // prepare updates for each field
-  static float rpr_joint_states_pos[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
-  static float rpr_joint_states_vel[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
+  float rpr_joint_states_pos[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
+  float rpr_joint_states_vel[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
   //static float joint_states_eff[RPR_JOINT_NUM] = {0.0, 0.0};
 
+  float base_servo_pos = static_cast<float>(base_curr_position);
+  float LA_pos = static_cast<float>(LA_curr_position);
+  float end_servo_pos = static_cast<float>(end_curr_position);
+
   // temp hard coded for test
-  rpr_joint_states_pos[0] = 1.0;
-  rpr_joint_states_pos[1] = 2.0;
-  rpr_joint_states_pos[2] = 3.0;
+  rpr_joint_states_pos[0] = base_servo_pos;
+  rpr_joint_states_pos[1] = LA_pos;
+  rpr_joint_states_pos[2] = end_servo_pos;
 
-  rpr_joint_states_vel[0] = 1.0;
-  rpr_joint_states_vel[1] = 2.0;
-  rpr_joint_states_vel[2] = 3.0;
+  rpr_joint_states_vel[0] = 0.0;
+  rpr_joint_states_vel[1] = 0.0;
+  rpr_joint_states_vel[2] = 0.0;
 
-  joint_states.position = rpr_joint_states_pos;
-  joint_states.velocity = rpr_joint_states_vel;
+  // assign values to msg fields
+  rpr_joint_states.position = rpr_joint_states_pos;
+  rpr_joint_states.velocity = rpr_joint_states_vel;
+  // rpr_joint_states.effort = ;
+
+}
+
+
+void initJointDebug()
+{
+  // intialize message to zero
+  long int tmp_debug[DEBUG_LENGTH] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+  joint_debug_array.data = tmp_debug;
+}
+
+void setJointDebugMsg()
+{
+  long int tmp_debug[DEBUG_LENGTH] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; 
+  
+  tmp_debug[0] = base_curr_position;
+  tmp_debug[1] = base_goal_position;
+  tmp_debug[2] = base_is_moving;
+  
+  tmp_debug[3] = LA_curr_position;
+  tmp_debug[4] = LA_goal_position;
+  tmp_debug[5] = LA_is_moving;
+  
+  tmp_debug[6] = end_curr_position;
+  tmp_debug[7] = end_goal_position;
+  tmp_debug[8] = end_is_moving;
+
+  // assign temp values to global message 
+  joint_debug_array.data = tmp_debug;
+
+}
+
+void publishJointDebug()
+{
+  ros::Time stamp_now = rosNow();
+//  joint_debug_array.heBase Bader.stamp = stamp_now;
+  joint_debug_pub.publish(&joint_debug_array);
 }
 
 
@@ -598,6 +656,7 @@ void updateJointStates(void)
 
   joint_states_vel[LEFT]  = last_velocity[LEFT];
   joint_states_vel[RIGHT] = last_velocity[RIGHT];
+  
 
   joint_states.position = joint_states_pos;
   joint_states.velocity = joint_states_vel;

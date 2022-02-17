@@ -7,6 +7,7 @@
 #include <std_msgs/Bool.h>
 #include <std_msgs/Empty.h>
 #include <std_msgs/Int32.h>
+#include <std_msgs/Int32MultiArray.h>
 #include <std_msgs/Float64.h>
 #include <std_msgs/Float64MultiArray.h>
 #include <sensor_msgs/JointState.h>
@@ -36,6 +37,7 @@
 #define LINEAR_ACTUATOR_CONTROL_FREQEUNCY      100000   //hz using micros
 #define SERVO_CONTROL_FREQEUNCY                11       //hz 
 #define RPR_JOINT_NUM                          3        //number of joints in RPR
+#define DEBUG_LENGTH                           9        //size of debug array
 
 #define CONTROL_MOTOR_SPEED_FREQUENCY          30       //hz
 #define IMU_PUBLISH_FREQUENCY                  200      //hz
@@ -245,13 +247,16 @@ uint8_t battery_state = 0;
 
 // prototypes for functions used for rpr joint state message 
 void initRPRJointStates(void);
-void setRPRJointState(void)
-void publishRPRJointState(void)
+void setRPRJointState(void);
+void publishRPRJointState(void);
+
+void initJointDebug(void);
+void setJointDebugMsg(void);
+void publishJointDebug(void);
 
 // declaration of joint control functions called from software timer
 void LAJointControl(void); 
 void servoJointControl(void);
-
 
 // callback function prototypes for linear actuator and base/end servos
 void LAJointCallback(const std_msgs::Float64MultiArray& linear_actuator_joint_msg);
@@ -265,10 +270,12 @@ ros::Subscriber<std_msgs::Float64MultiArray> servo_position_sub("servo_joint_tra
 static unsigned long tTimeMicros[1]; 
 
 // publisher of joint states
-sensor_msgs::JointState rpr_joint_statesjoint_states;
+sensor_msgs::JointState rpr_joint_states;
 ros::Publisher rpr_joint_states_pub("rpr_joint_state", &rpr_joint_states);
 
-// bool is_moving        = false; //TODO delete if unused
+std_msgs::Int32MultiArray joint_debug_array;
+ros::Publisher joint_debug_pub("joint_debug", &joint_debug_array);
+
 // builder: intialize float arrays used to maintain joint goal updates from callback functions
 std_msgs::Float64MultiArray la_goal_point;
 std_msgs::Float64MultiArray servo_goal_point;
