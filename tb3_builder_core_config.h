@@ -35,6 +35,7 @@
 // builder: control frequency for RPR_manipulator joints
 #define LINEAR_ACTUATOR_CONTROL_FREQEUNCY      100000   //hz using micros
 #define SERVO_CONTROL_FREQEUNCY                11       //hz 
+#define RPR_JOINT_NUM                          3        //number of joints in RPR
 
 #define CONTROL_MOTOR_SPEED_FREQUENCY          30       //hz
 #define IMU_PUBLISH_FREQUENCY                  200      //hz
@@ -69,11 +70,6 @@ void soundCallback(const turtlebot3_msgs::Sound& sound_msg);
 void motorPowerCallback(const std_msgs::Bool& power_msg);
 void resetCallback(const std_msgs::Empty& reset_msg);
 
-// builder: callback function prototypes for linear actuator and base/end servos
-void LAJointCallback(const std_msgs::Float64MultiArray& LA_joint_msg);
-void servoJointCallback(const std_msgs::Float64MultiArray& servo_msg);
-// void jointTrajectoryPointCallback(const std_msgs::Float64MultiArray& joint_trajectory_point_msg);
-// void gripperPositionCallback(const std_msgs::Float64MultiArray& pos_msg);
 
 // Function prototypes
 void publishCmdVelFromRC100Msg(void);
@@ -101,10 +97,6 @@ void initOdom(void);
 void initJointStates(void);
 
 bool calcOdometry(double diff_time);
-
-// builder: declaration of joint control functions called from software timer
-void LAJointControl(void); // void jointControl(void);
-void servoJointControl(void);
 
 void sendLogMsg(void);
 void waitForSerialLink(bool isConnected);
@@ -143,21 +135,6 @@ ros::Subscriber<turtlebot3_msgs::Sound> sound_sub("sound", soundCallback);
 ros::Subscriber<std_msgs::Bool> motor_power_sub("motor_power", motorPowerCallback);
 
 ros::Subscriber<std_msgs::Empty> reset_sub("reset", resetCallback);
-
-
-/* builder: subscribers for custom drivers 
-    arg1: topic name
-    arg2: callback function handle
-    TODO: rename topic names
-*/  
-// ros::Subscriber<std_msgs::Float64MultiArray> joint_position_sub("joint_trajectory_point", jointTrajectoryPointCallback);
-// ros::Subscriber<std_msgs::Float64MultiArray> gripper_position_sub("gripper_position", gripperPositionCallback);
-ros::Subscriber<std_msgs::Float64MultiArray> la_position_sub("joint_trajectory_point", LAJointCallback);
-ros::Subscriber<std_msgs::Float64MultiArray> servo_position_sub("gripper_position", servoJointCallback);
-
-// TODO accompanying publishers
-//   joint_trajectory_point_pub_ = nh_.advertise<std_msgs::Float64MultiArray>("joint_trajectory_point", 10);
-//   gripper_pub_ = nh_.advertise<std_msgs::Float64MultiArray>("gripper_position", 10);
 
 /*******************************************************************************
 * Publisher
@@ -209,13 +186,11 @@ tf::TransformBroadcaster tf_broadcaster;
 * SoftwareTimer of Turtlebot3
 *******************************************************************************/
 static uint32_t tTime[10]; 
-static unsigned long tTimeMicros[1]; // builder: store micros resolution for linear actuator
  
 /*******************************************************************************
 * Declaration for motor
 *******************************************************************************/
 Turtlebot3MotorDriver motor_driver;
-// TODO jeremy: declare driver class objects if neccesary 
 
 /*******************************************************************************
 * Calculation for odometry
@@ -264,13 +239,36 @@ double odom_vel[3];
 bool setup_end        = false;
 uint8_t battery_state = 0;
 
-
 /*******************************************************************************
-* Joint Control
+* builder: RPR Joint Control
 *******************************************************************************/
-// TODO confirm this entire section is needed or edited properly
+
+// prototypes for functions used for rpr joint state message 
+void initRPRJointStates(void);
+void setRPRJointState(void)
+void publishRPRJointState(void)
+
+// declaration of joint control functions called from software timer
+void LAJointControl(void); 
+void servoJointControl(void);
+
+
+// callback function prototypes for linear actuator and base/end servos
+void LAJointCallback(const std_msgs::Float64MultiArray& linear_actuator_joint_msg);
+void servoJointCallback(const std_msgs::Float64MultiArray& servo_msg);
+
+// subscriber to commands from remote PC
+ros::Subscriber<std_msgs::Float64MultiArray> la_position_sub("rpr_joint_trajectory_point", LAJointCallback);
+ros::Subscriber<std_msgs::Float64MultiArray> servo_position_sub("servo_joint_trajectory_point", servoJointCallback);
+
+// store micros resolution for linear actuator
+static unsigned long tTimeMicros[1]; 
+
+// publisher of joint states
+sensor_msgs::JointState rpr_joint_statesjoint_states;
+ros::Publisher rpr_joint_states_pub("rpr_joint_state", &rpr_joint_states);
+
 // bool is_moving        = false; //TODO delete if unused
-// std_msgs::Float64MultiArray joint_trajectory_point;
 // builder: intialize float arrays used to maintain joint goal updates from callback functions
 std_msgs::Float64MultiArray la_goal_point;
 std_msgs::Float64MultiArray servo_goal_point;
