@@ -73,7 +73,7 @@ class NavigationActionServer(object):
         # self.action_server.publish_feedback(self.feedback)      # publish feedback
 
         ##### execute action #####
-
+        
         # grid navigation is requested
         if goal.command == "grid_navigation":
 
