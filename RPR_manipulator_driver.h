@@ -24,7 +24,7 @@
 #define GO_HOME_CMD {ALL_JOINTS,BASE_ZERO_POSITION_PULSE_WIDTH,{0,DEFAULT_MODE,LA_MAX_VEL_NO_ACCEL},END_ZERO_POSITION_PULSE_WIDTH}
 // Template Arm_Move_Command that initializes everything to default values so that
   // only the members which are changed need to be specified
-#define LA_MAVE_CMD_INIT(...) {.joints_to_move = {0,0,0}, \
+#define LA_MOVE_CMD_INIT(...) {.joints_to_move = {0,0,0}, \
                                .base_cmd = 0, \
                                .LA_cmd = LA_NO_MOVE_CMD, \
                                .end_cmd = 0, \
