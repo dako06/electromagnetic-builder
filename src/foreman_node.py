@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from unittest import result
 import numpy as np
 import rospy 
 import smach
@@ -84,8 +83,12 @@ class navigateToZone(smach.State):
 
         # call action server to perform navigation based on input key
         print("executing navigation request to: %s" % userdata.execute_request)
-        result = foreman.requestNavigation(userdata.execute_request)
-
+        
+        if userdata.execute_request == "block_zone" or userdata.execute_request == "build_zone":
+            result = foreman.requestNavigation(userdata.execute_request)
+        elif userdata.execute_request == "shimmy":
+            result = foreman.requestNavigation(userdata.execute_request)
+        
         if result:        
             return 'arrived'
         else: 

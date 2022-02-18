@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 
 import rospy
+import numpy as np
 from std_msgs.msg import Int32MultiArray  
 
-import csv
-        
+import pyexcel
+
+
+
 class JointDebug():
 
     def __init__(self):
@@ -14,18 +17,25 @@ class JointDebug():
         self.message = Int32MultiArray()
         self.msg_length = 9
         self.msg_field = ["BASE SERVO", "LINEAR ACTUATOR", "END SERVO"]
-        
-        self.values = []
+        self.data = list()
 
+        try:
+            pass
+        except rospy.ROSInterruptException:
+            rospy.loginfo("Action terminated.")
+        finally:
+            # save trajectory into csv file
+            np.savetxt('joint_debug.csv', np.array(self.data), fmt='%f')
+        
+       
     def joint_debug_callback(self, msg):
         
-        self.values.apppend(msg.data) 
-        
-
+        self.data.append(msg.data)
 
 
 if __name__ == '__main__':
 
     #### intialize server node and class ####
     jdebug = JointDebug()
+   
     rospy.spin()
