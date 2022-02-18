@@ -27,6 +27,7 @@ void setup()
   nh.advertise(rpr_joint_states_pub);
   nh.advertise(joint_debug_pub);
 
+
   nh.advertise(sensor_state_pub);  
   nh.advertise(version_info_pub);
   nh.advertise(imu_pub);
@@ -292,8 +293,8 @@ void  initRPRJointStates()
   rpr_joint_states.effort_length = 3;
 
   
-  float rpr_joint_states_pos[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
-  float rpr_joint_states_vel[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
+  static float rpr_joint_states_pos[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
+  static float rpr_joint_states_vel[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
 
   rpr_joint_states.position = rpr_joint_states_pos;
   rpr_joint_states.velocity = rpr_joint_states_vel;
@@ -315,8 +316,8 @@ void setRPRJointState()
 {
  
   // prepare updates for each field
-  float rpr_joint_states_pos[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
-  float rpr_joint_states_vel[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
+  static float rpr_joint_states_pos[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
+  static float rpr_joint_states_vel[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
   //static float joint_states_eff[RPR_JOINT_NUM] = {0.0, 0.0};
 
   float base_servo_pos = static_cast<float>(base_curr_position);
@@ -343,13 +344,28 @@ void setRPRJointState()
 void initJointDebug()
 {
   // intialize message to zero
-  long int tmp_debug[DEBUG_LENGTH] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+  static long tmp_debug[DEBUG_LENGTH]; 
+
+  tmp_debug[0] = 0.0;
+  tmp_debug[1] = 0.0;
+  tmp_debug[2] = 0.0;
+  
+  tmp_debug[3] = 0.0;
+  tmp_debug[4] = 0.0;
+  tmp_debug[5] = 0.0;
+  
+  tmp_debug[6] = 0.0;
+  tmp_debug[7] = 0.0;
+  tmp_debug[8] = 0.0;
+ 
   joint_debug_array.data = tmp_debug;
+  joint_debug_array.data_length = DEBUG_LENGTH;
+   
 }
 
 void setJointDebugMsg()
 {
-  long int tmp_debug[DEBUG_LENGTH] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; 
+  static long tmp_debug[DEBUG_LENGTH]; // = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; 
   
   tmp_debug[0] = base_curr_position;
   tmp_debug[1] = base_goal_position;
@@ -365,6 +381,8 @@ void setJointDebugMsg()
 
   // assign temp values to global message 
   joint_debug_array.data = tmp_debug;
+  joint_debug_array.data_length = DEBUG_LENGTH;
+
 
 }
 

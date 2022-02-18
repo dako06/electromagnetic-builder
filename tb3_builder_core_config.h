@@ -276,6 +276,7 @@ ros::Publisher rpr_joint_states_pub("rpr_joint_state", &rpr_joint_states);
 std_msgs::Int32MultiArray joint_debug_array;
 ros::Publisher joint_debug_pub("joint_debug", &joint_debug_array);
 
+
 // builder: intialize float arrays used to maintain joint goal updates from callback functions
 std_msgs::Float64MultiArray la_goal_point;
 std_msgs::Float64MultiArray servo_goal_point;
