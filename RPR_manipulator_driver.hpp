@@ -69,7 +69,7 @@
 /*********************************** Base servo functions ****************************************************/
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void Init_Base_Servo() {
-//  analogReference(INTERNAL1v1);     // TODO resolve scope declaration
+//  analogReference(DEFAULT);     // TODO resolve scope declaration
   pinMode(BASE_SIGNAL_PIN, OUTPUT);
   pinMode(BASE_FEEDBACK_PIN, INPUT);
   Base_joint.attach(BASE_SIGNAL_PIN);
@@ -82,12 +82,12 @@ void Base_Servo_Move_Callback() {
     // in the previous iteration. When this function is first called, the base servo will be arriving at the position which
     // was assigned to new_position at the end of the previous iteration, and the current position is updated to reflect this
   static int new_position = 0;
-  if (new_position != 0) {
-    base_curr_position = new_position;
-  }
+//  if (new_position != 0) {
+//    base_curr_position = new_position;
+//  }
   new_position = base_curr_position + (base_move_dir * BASE_WIDTH_INCREMENT);
-  if (Base_Is_Valid_Position(new_position)) {
-    // Do not start a for loop if we are already within 1 iteration of the target position
+  base_curr_position = new_position;
+  //if (Base_Is_Valid_Position(new_position)) {
     if (abs(new_position - base_goal_position) <= BASE_WIDTH_INCREMENT) {
       Base_joint.write(new_position);
       // Goal position reached
@@ -96,13 +96,13 @@ void Base_Servo_Move_Callback() {
     else {
       Base_joint.write(new_position);
     }
-    Update_Base_Angle_Tan(new_position);
-  }
-  else {
-    Serial.print("new_position was invalid in Base_Servo_Move_Callback: ");
-    Serial.println(new_position);
-    base_is_moving = false;
-  }
+    //Update_Base_Angle_Tan(new_position);
+  //}
+//  else {
+//    Serial.print("new_position was invalid in Base_Servo_Move_Callback: ");
+//    Serial.println(new_position);
+//    base_is_moving = false;
+//  }
 }
 void Prepare_Base_Servo_Move_Task(int goal_position) {
  if (goal_position > BASE_MAX_PULSE_WIDTH || goal_position < BASE_MIN_PULSE_WIDTH) {
@@ -365,12 +365,12 @@ void Prepare_Arm_Motion(Arm_Move_Command cmd) {
   if (cmd.joints_to_move[0]) {
     Prepare_Base_Servo_Move_Task(cmd.base_cmd);
   }
-  if (cmd.joints_to_move[1]) {
-    Prepare_LA_Move_Task(cmd.LA_cmd);
-  }
-  if (cmd.joints_to_move[2]) {
-    Prepare_End_Servo_Move_Task(cmd.end_cmd);
-  }
+//  if (cmd.joints_to_move[1]) {
+//    Prepare_LA_Move_Task(cmd.LA_cmd);
+//  }
+//  if (cmd.joints_to_move[2]) {
+//    Prepare_End_Servo_Move_Task(cmd.end_cmd);
+//  }
 }
 void Queue_Return_To_Home() {
   Arm_Move_Command go_home = GO_HOME_CMD;
@@ -391,7 +391,7 @@ void Test_Base() {
   Arm_Move_Queue.enqueue(test_max_angle);
   Arm_Move_Command test_min_angle = {BASE_ONLY,BASE_MIN_PULSE_WIDTH,LA_NO_MOVE_CMD,0};
   Arm_Move_Queue.enqueue(test_min_angle);
-  Queue_Return_To_Home();
+//  Queue_Return_To_Home();
 }
 void Test_LA() {
   // Test independent movement for the linear actuator

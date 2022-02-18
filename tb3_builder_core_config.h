@@ -254,17 +254,16 @@ void initJointDebug(void);
 void setJointDebugMsg(void);
 void publishJointDebug(void);
 
+
+
+/********************** RPR Joint Control **********************/
+
 // declaration of joint control functions called from software timer
-void LAJointControl(void); 
-void servoJointControl(void);
+void JointControl(void); 
 
-// callback function prototypes for linear actuator and base/end servos
-void LAJointCallback(const std_msgs::Float64MultiArray& linear_actuator_joint_msg);
-void servoJointCallback(const std_msgs::Float64MultiArray& servo_msg);
-
-// subscriber to commands from remote PC
-ros::Subscriber<std_msgs::Float64MultiArray> la_position_sub("rpr_joint_trajectory_point", LAJointCallback);
-ros::Subscriber<std_msgs::Float64MultiArray> servo_position_sub("servo_joint_trajectory_point", servoJointCallback);
+void RPRJointCallback(const std_msgs::Int32MultiArray& joint_goal_request);
+ros::Subscriber<std_msgs::Int32MultiArray> rpr_position_sub("rpr_joint_trajectory", RPRJointCallback);
+std_msgs::Int32MultiArray rpr_joint_goal;
 
 // store micros resolution for linear actuator
 static unsigned long tTimeMicros[1]; 
@@ -277,8 +276,6 @@ std_msgs::Int32MultiArray joint_debug_array;
 ros::Publisher joint_debug_pub("joint_debug", &joint_debug_array);
 
 
-// builder: intialize float arrays used to maintain joint goal updates from callback functions
-std_msgs::Float64MultiArray la_goal_point;
-std_msgs::Float64MultiArray servo_goal_point;
+
 
 #endif // TURTLEBOT3_BUILDER_CORE_CONFIG_H_

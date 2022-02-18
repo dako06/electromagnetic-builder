@@ -21,6 +21,6 @@ bool End_Is_Valid_Position(int position); // Need to add to .cpp
 
 void End_Servo_Move_Callback();
 void Prepare_End_Servo_Move_Task(int goal_position);
-bool end_is_moving; // flag to tell if the task has completed
+bool end_is_moving{false}; // flag to tell if the task has completed
 
 #endif

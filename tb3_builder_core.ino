@@ -14,20 +14,9 @@ void setup()
   nh.getHardware()->setBaud(115200);
 
   nh.subscribe(cmd_vel_sub);
-
-  // initialize subscribers for RPR manipulator and electromagnet topic's 
-  nh.subscribe(la_position_sub);
-  nh.subscribe(servo_position_sub);
-
   nh.subscribe(sound_sub);
   nh.subscribe(motor_power_sub);
   nh.subscribe(reset_sub);
-  
-  // builder: publisher for rpr joint states
-  nh.advertise(rpr_joint_states_pub);
-  nh.advertise(joint_debug_pub);
-
-
   nh.advertise(sensor_state_pub);  
   nh.advertise(version_info_pub);
   nh.advertise(imu_pub);
@@ -37,38 +26,39 @@ void setup()
   nh.advertise(battery_state_pub);
   nh.advertise(mag_pub);
 
+  /* builder: ROS entities */
+  // initialize subscribers for RPR manipulator and electromagnet topic's 
+  nh.subscribe(rpr_position_sub);
+  
+  // publisher for rpr joint states and joint debug
+  nh.advertise(rpr_joint_states_pub);
+  nh.advertise(joint_debug_pub);
+
+
   tf_broadcaster.init(nh);
-
-  // Setting for Dynamixel motors
-  motor_driver.init(NAME);
-
-  // builder: intialize driver objects
-  Init_Base_Servo();
-  Init_Linear_Actuator();
-  Init_End_Servo();
-
-  // Setting for IMU
-  sensors.init();
-
-  // Init diagnosis
-  diagnosis.init();
-
-  // Setting for ROBOTIS RC100 remote controller and cmd_vel
-  controllers.init(MAX_LINEAR_VELOCITY, MAX_ANGULAR_VELOCITY);
-
-  // Setting for SLAM and navigation (odometry, joint states, TF)
-  initOdom();
-
+  motor_driver.init(NAME);                                      // Setting for Dynamixel motors
+  sensors.init();                                               // Setting for IMU
+  diagnosis.init();                                             // Init diagnosis
+  controllers.init(MAX_LINEAR_VELOCITY, MAX_ANGULAR_VELOCITY);  // Setting for ROBOTIS RC100 remote controller and cmd_vel
+  initOdom();                                                   // Setting for SLAM and navigation (odometry, joint states, TF)
   initJointStates();
 
-  // builder: intialize the RPR joint states message used for publishing
+
+  /* builder: intialize joint messages and joint drivers */
+  
+  // intialize messages for rpr joint states and joint debug
   initRPRJointStates();
   initJointDebug();
 
-  // builder: joint test function
+  // intialize driver objects
+  Init_Base_Servo();
+//  Init_Linear_Actuator();
+//  Init_End_Servo();
+
+  // joint test function
   Test_Base();
-//  Test_LA();
-//  Test_End();
+  // Test_LA();
+  // Test_End();
 
   prev_update_time = millis();
   pinMode(LED_WORKING_CHECK, OUTPUT);
@@ -138,35 +128,52 @@ void loop()
   }
 #endif
 
-  // If there is a move command in the queue and the arm is not currently moving,
-    // start the next motion
+  /**********************************************************************/
+  /*********** electromagnetic builder software timer modules ***********/
+  /**********************************************************************/
+
+  /* If there is a move command in the queue and the arm is not currently moving, start the next motion */
   if (!(base_is_moving || LA_is_moving || end_is_moving)) {
     if (!Arm_Move_Queue.isEmpty()) {
       Prepare_Arm_Motion(Arm_Move_Queue.dequeue());
     }
   }
 
-  /* builder: statement executes at 90 ms
-      function call executes control of base and end servo of the RPR manipulator */ 
-      // Maybe we should replace the statement on the right side of the comparison with a single integer
+  /* execute control of base and end servo of the RPR manipulator (T=90 ms) */ 
   if ((t-tTime[6]) >= 90) //(1000 / SERVO_CONTROL_FREQEUNCY))
   {
-    servoJointControl(); 
+
+    // uint32_t all_points_cnt = rpr_joint_goal.data_length; example accessing length
+    // accessing using long tmp = rpr_joint_goal.data[0]
+
+    /* alternative to below is to include servo and linear actuator control within function JointControl();
+     *    and call this function here
+     */
+    
+    /* base_is_moving is set true by whatever starts moving the arm, and is set false inside of Base_Servo_Move_Callback */
+    if (base_is_moving) {
+      Base_Servo_Move_Callback();
+    }
+    
+    /* end_is_moving is set true by whatever starts moving the arm, and is set false inside of End_Servo_Move_Callback */
+    //if (end_is_moving) {
+      //End_Servo_Move_Callback();
+    //} 
+    
     setRPRJointState();
     publishRPRJointState();
 
     tTime[6] = t;
   }
+  
+  // execute control of the linear actuator on the RPR manipulator (T=10micros (1000000 micros = 1s))
+  //  if ((t_micros-tTimeMicros[0]) >= LA_curr_pulse_width)
+  //  {
+  //    LAJointControl(); // TODO jeremy: edit this function to control linear acuator every period
+  //    tTimeMicros[0] = t_micros;
+  //  }
 
-  /* builder: running at 10 micros (1000000 micros = 1s)  
-      function call executes control of the linear actuator fo the RPR manipulator */
-  if ((t_micros-tTimeMicros[0]) >= LA_curr_pulse_width)
-  {
-    LAJointControl(); // TODO jeremy: edit this function to control linear acuator every period
-    tTimeMicros[0] = t_micros;
-  }
-
-  if ((t-tTime[7]) >= 50)
+  if ((t-tTime[7]) >= 90)
   {
     setJointDebugMsg();
     publishJointDebug();
@@ -190,10 +197,6 @@ void loop()
 
   // Update the IMU unit
   sensors.updateIMU();
-
-  // TODO
-  // Update sonar data
-  // sensors.updateSonar(t);
 
   // Start Gyro Calibration after ROS connection
   updateGyroCali(); // TODO confirm this works over below
@@ -221,65 +224,36 @@ void loop()
 /** @param linear_actuator_joint_msg - message containing coordinates for linear actuator to execute
  *  @note callback function to respond to movement commands from the remote PC  */
 
-void LAJointCallback(const std_msgs::Float64MultiArray& linear_actuator_joint_msg)
-{
-  // if (is_moving == false)
-  // {
-  //   joint_trajectory_point = joint_trajectory_point_msg;
-  //   is_moving = true;
-  // }
-
-  // TODO complete call back
-//  la_goal_point = linear_actuator_joint_msg;
-}
 
 /** @param servo_msg - message containing coordinates for base and end servo to execute
  *  @note callback function to respond to movement commands from the remote PC  */
 
-void servoJointCallback(const std_msgs::Float64MultiArray& servo_msg)
+void RPRJointCallback(const std_msgs::Int32MultiArray& joint_goal_request)
 {
-  // double goal_gripper_position[5] = {0.0, };
-  // const double OPEN_MANIPULATOR_GRIPPER_OFFSET = -0.015f;
-
-  // for (int index = 0; index < gripper_cnt; index++)
-  //   goal_gripper_position[index] = gripper_msg.data[index] / OPEN_MANIPULATOR_GRIPPER_OFFSET;
-
-  // manipulator_driver.writeGripperPosition(goal_gripper_position);
-
-  // TODO complete call back
-//  servo_goal_point = servo_msg;  
+//   if (is_moving == false)
+//  {
+//    servo_goal = servo_msg;
+//  }
+//  is_moving == true;
+  rpr_joint_goal = joint_goal_request;
 }
 
 /** @note function called in software timer to handle direct actuator movement */
 
-void LAJointControl(void)
+void JointControl(void)
 {
-  if (LA_is_moving) {
-    if (LA_is_homing) {
-      Homing_Callback();
-    }
-    else {
-      Lin_Act_Move_Callback();
-    }
-  }
+//  if (LA_is_moving) {
+//    if (LA_is_homing) {
+//      Homing_Callback();
+//    }
+//    else {
+//      Lin_Act_Move_Callback();
+//    }
+//  }
 }
 
-/** @note function called in software timer to direct base/end servo movement */
 
-void servoJointControl(void)
-{
-  // base_is_moving is set true by whatever starts moving the arm, and is set
-    // false inside of Base_Servo_Move_Callback
-  if (base_is_moving) {
-    Base_Servo_Move_Callback();
-  }
-  // end_is_moving is set true by whatever starts moving the arm, and is set
-    // false inside of End_Servo_Move_Callback
-  if (end_is_moving) {
-    End_Servo_Move_Callback();
-  }
 
-}
 
 /** @note this function intializes the joint state message for adjustment throughout execution */
 
@@ -321,13 +295,13 @@ void setRPRJointState()
   //static float joint_states_eff[RPR_JOINT_NUM] = {0.0, 0.0};
 
   float base_servo_pos = static_cast<float>(base_curr_position);
-  float LA_pos = static_cast<float>(LA_curr_position);
-  float end_servo_pos = static_cast<float>(end_curr_position);
+//  float LA_pos = static_cast<float>(LA_curr_position);
+//  float end_servo_pos = static_cast<float>(end_curr_position);
 
   // temp hard coded for test
   rpr_joint_states_pos[0] = base_servo_pos;
-  rpr_joint_states_pos[1] = LA_pos;
-  rpr_joint_states_pos[2] = end_servo_pos;
+  rpr_joint_states_pos[1] = 0; //LA_pos;
+  rpr_joint_states_pos[2] = 0; //end_servo_pos;
 
   rpr_joint_states_vel[0] = 0.0;
   rpr_joint_states_vel[1] = 0.0;
@@ -357,39 +331,36 @@ void initJointDebug()
   tmp_debug[6] = 0.0;
   tmp_debug[7] = 0.0;
   tmp_debug[8] = 0.0;
- 
+
+  // assign static array to global message 
   joint_debug_array.data = tmp_debug;
   joint_debug_array.data_length = DEBUG_LENGTH;
-   
 }
 
 void setJointDebugMsg()
 {
-  static long tmp_debug[DEBUG_LENGTH]; // = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; 
-  
+  static long tmp_debug[DEBUG_LENGTH];  
+ 
   tmp_debug[0] = base_curr_position;
   tmp_debug[1] = base_goal_position;
   tmp_debug[2] = base_is_moving;
   
-  tmp_debug[3] = LA_curr_position;
-  tmp_debug[4] = LA_goal_position;
-  tmp_debug[5] = LA_is_moving;
+  tmp_debug[3] = 0;//LA_curr_position;
+  tmp_debug[4] = 0;//LA_goal_position;
+  tmp_debug[5] = 0;//LA_is_moving;
   
-  tmp_debug[6] = end_curr_position;
-  tmp_debug[7] = end_goal_position;
-  tmp_debug[8] = end_is_moving;
+  tmp_debug[6] = 0;//end_curr_position;
+  tmp_debug[7] = 0;//end_goal_position;
+  tmp_debug[8] = 0;//end_is_moving;
 
   // assign temp values to global message 
   joint_debug_array.data = tmp_debug;
   joint_debug_array.data_length = DEBUG_LENGTH;
-
-
 }
 
 void publishJointDebug()
 {
   ros::Time stamp_now = rosNow();
-//  joint_debug_array.heBase Bader.stamp = stamp_now;
   joint_debug_pub.publish(&joint_debug_array);
 }
 

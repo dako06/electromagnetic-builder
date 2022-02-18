@@ -55,7 +55,7 @@ struct LA_Move_Command {
 void Lin_Act_Move_Callback();
 void Prepare_LA_Move_Task(LA_Move_Command LA_cmd);
 void LA_Update_Pulse_Width();
-bool LA_is_moving; // flag to tell if the task has completed
+bool LA_is_moving{false}; // flag to tell if the task has completed
 bool LA_is_homing;
 void Homing_Callback();
 void Start_LA_Homing();
