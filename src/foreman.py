@@ -40,6 +40,12 @@ class Foreman:
         self.BLOCK_WIDTH = 1.5
         self.BLOCK_HEIGHT = 1.5
 
+        # preset values for block and build zones
+        self.block_zone_x = 2
+        self.block_zone_y = 3
+        self.build_zone_x = 5
+        self.build_zone_y = 5
+
         self.block_center_mask =  (self.BLOCK_WIDTH/2, self.BLOCK_LENGTH/2)  
 
         """ iterator used to track index of current block position in blueprint array
@@ -132,28 +138,29 @@ class Foreman:
     def requestNavigation(self, zone):
         """ @note request grid navigation from navigation server """
 
+        # intialize goal and result data type
+        action_result = NavigationResult()
+        nav_goal = NavigationGoal()
+        
         # wait for server to prepare for goals
         self.navi_client.wait_for_server()    
 
-        # final_result = NavigationResult()
-
-        # intialize goal data type
-        nav_goal = NavigationGoal()
 
         if zone == "shimmy":
             nav_goal.x = 0
             nav_goal.y = 0
             nav_goal.command = "shimmy"
+
         else:
 
             nav_goal.command = "grid_navigation"
             
-            if zone == 'blockzone':
-                nav_goal.x = 1
-                nav_goal.y = 1
-            elif zone =='buildzone':
-                nav_goal.x = 5
-                nav_goal.y = 4
+            if zone == 'block_zone':
+                nav_goal.x = self.block_zone_x
+                nav_goal.y = self.block_zone_y
+            elif zone =='build_zone':
+                nav_goal.x = self.build_zone_x
+                nav_goal.y = self.build_zone_y
         
         # send goal to action server and wait for completion
         self.navi_client.send_goal(nav_goal) 

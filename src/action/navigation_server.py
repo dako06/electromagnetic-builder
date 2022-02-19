@@ -98,7 +98,11 @@ class NavigationActionServer(object):
         #### return result of action ####
         # rospy.loginfo('%s: Succeeded' % self.action_name)
         self.action_server.set_succeeded(self.result)
+        
 
+    ######################################################################################
+    ################################## GRID NAVIGATION ###################################
+    ######################################################################################
 
     def get_path_from_A_star(self, start, goal, obstacles):
         """
