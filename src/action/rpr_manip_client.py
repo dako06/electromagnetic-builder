@@ -17,8 +17,8 @@ class ManipulatorClient():
     def __init__(self):
 
         # initialize client
+        rospy.init_node('rpr_client')
         self.client = SimpleActionClient('rpr_manip_action', RPRManipulatorAction)
-
 
 
     def requestManipulatorAction(self):
@@ -29,6 +29,9 @@ class ManipulatorClient():
         # intialize goal data type
         manip_goal = RPRManipulatorGoal()
 
+        manip_goal.x = 1.0
+        manip_goal.y = 2.0
+        manip_goal.z = 3.0
 
         # send goal to action server and wait for completion
         self.client.send_goal(manip_goal)  
@@ -41,3 +44,15 @@ class ManipulatorClient():
         return action_result
 
 
+if __name__ == '__main__':
+
+    #### intialize server node and class ####
+    client = ManipulatorClient()
+
+    try: 
+        client.requestManipulatorAction()
+    except rospy.ROSInterruptException:
+        rospy.loginfo("Action terminated.")
+    # finally:
+
+    rospy.spin()

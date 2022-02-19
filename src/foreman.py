@@ -14,6 +14,10 @@ from electromagnetic_builder.msg import NavigationAction
 from electromagnetic_builder.msg import NavigationResult
 
 
+from electromagnetic_builder.msg import RPRManipulatorGoal
+from electromagnetic_builder.msg import RPRManipulatorAction
+
+
 DEBUG = 1
 
 class Foreman:
@@ -22,7 +26,11 @@ class Foreman:
     def __init__(self):  
 
         # initialize navigation client
-        self.client = SimpleActionClient('navigation_action', NavigationAction)
+        self.navi_client = SimpleActionClient('navigation_action', NavigationAction)
+
+        # intialize rpr maniupulator client
+        self.rpr_client = SimpleActionClient('rpr_manip_action', RPRManipulatorAction)
+
 
         #### CONSTANTS ####
         self.ROW_MAX = 5
@@ -125,7 +133,7 @@ class Foreman:
         """ @note request grid navigation from navigation server """
 
         # wait for server to prepare for goals
-        self.client.wait_for_server()    
+        self.navi_client.wait_for_server()    
 
         # final_result = NavigationResult()
 
@@ -148,11 +156,32 @@ class Foreman:
                 nav_goal.y = 4
         
         # send goal to action server and wait for completion
-        self.client.send_goal(nav_goal) 
-        self.client.wait_for_result()
+        self.navi_client.send_goal(nav_goal) 
+        self.navi_client.wait_for_result()
 
         # get result from server
-        action_result = self.client.get_result()
+        action_result = self.navi_client.get_result()
+
+        # return result to state machine
+        return action_result
+
+
+
+    def requestManipulatorAction(self):
+
+        # wait for server to prepare for goals
+        self.rpr_client.wait_for_server()    
+
+        # intialize goal data type
+        manip_goal = RPRManipulatorGoal()
+
+
+        # send goal to action server and wait for completion
+        self.rpr_client.send_goal(manip_goal)  
+        self.rpr_client.wait_for_result()
+
+        # get result from server
+        action_result = self.rpr_client.get_result()
 
         # return result to state machine
         return action_result

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from unittest import result
 import numpy as np
 import rospy 
 import smach
@@ -16,13 +15,13 @@ import smach
 # from geometry_msgs.msg import Twist, Pose2D
 
 from foreman import Foreman
-from action import navi_client
-from action import rpr_manip_client
+# from action import navi_client
+# from action import rpr_manip_client
 
 """ global objects used throughout state machine """
 foreman     = Foreman()
 # nav_client  = navi_client.NavigationClient()
-rpr_client  = rpr_manip_client.ManipulatorClient()
+# rpr_client  = rpr_manip_client.ManipulatorClient()
 
 
 """_____SMACH state machine functions_____"""

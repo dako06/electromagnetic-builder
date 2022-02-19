@@ -16,6 +16,9 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   std_msgs
   genmsg
+  cv_bridge
+  image_transport
+  message_generation
 )
 
 ## System dependencies are found with CMake's conventions
@@ -70,8 +73,6 @@ add_action_files(
   DIRECTORY action
   FILES Navigation.action
   FILES RPRManipulator.action
-  # Action1.action
-  # Action2.action
 )
 
 ## Generate added messages and services with any dependencies listed here
