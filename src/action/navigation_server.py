@@ -55,49 +55,55 @@ class NavigationActionServer(object):
         self.obstacles = []             # list of tuples encoding obstacles in grid
         # TODO init and have a way to update obstacles if needed
 
-        #### action messages ####
-        self.result     = NavigationResult()
-        self.feedback   = NavigationFeedback()
+        
     
     def execute_callback(self, goal):
         
-        
-        #### check for preempt request from client ####
-        if self.action_server.is_preempt_requested():
-            rospy.loginfo('%s: Preempted' % self.action_name)
-            self.action_server.set_preempted()                  
+        # intialize action messages 
+        result      = NavigationResult()
+        feedback    = NavigationFeedback()
+                      
             
-
-        #### report feedback ####
-        # rospy.loginfo('publishing feedback ...')
-        # self.action_server.publish_feedback(self.feedback)      # publish feedback
-
         ##### execute action #####
+    
+        # prepare start and goal as a tuple representing cells in grid
+        start_cell  = (0,0) # TODO have a way to retrieve start based on current position
+        goal_cell   = (goal.x, goal.y)
+
+        # get way points using A*
+        waypoints       = self.get_path_from_A_star(start_cell, goal_cell, self.obstacles)
+        waypoint_cnt    = len(waypoints)
+
+        # confirm waypoints is valid for movement
+        if waypoint_cnt == 0:
         
-        # grid navigation is requested
-        if goal.command == "grid_navigation":
-
-            # prepare start and goal as a tuple representing cells in grid
-            start_cell = (0,0) # TODO have a way to retrieve start based on current position
-            goal_cell = (goal.x, goal.y)
-
-            waypoints = self.get_path_from_A_star(start_cell, goal_cell, self.obstacles)
+            rospy.loginfo('%s: Waypoints were not succesfully found.\nExiting server.' % self.action_name)
+            result.arrived = False
+            self.action_server.set_aborted()
+        
+        else:
             waypoints.append(waypoints[-1])
-            print(waypoints)
+            rospy.loginfo('%s: Waypoints succesfully found.\nThere are %d waypoints to traverse.' % (self.action_name, waypoint_cnt))
+
 	
-            for i in range(len(waypoints)-1):
-                self.move_to_point(waypoints[i], waypoints[i+1])
+        for i in range(waypoint_cnt-1):
 
-        elif goal.command == "shimmy":
-            pass
+            # check for preempt request from client 
+            if self.action_server.is_preempt_requested():
+                rospy.loginfo('%s: Preempted' % self.action_name)
+                self.action_server.set_preempted() 
+            
+            else:
+
+                feedback.percent_complete = i/waypoint_cnt 
+                self.action_server.publish_feedback(feedback)       # publish feedback of percent of way points complete
+                self.move_to_point(waypoints[i], waypoints[i+1])    # move to next way point
 
 
-
-        self.result.arrived = True
-
-        #### return result of action ####
-        # rospy.loginfo('%s: Succeeded' % self.action_name)
-        self.action_server.set_succeeded(self.result)
+        # confirm action is successful then return result 
+        result.arrived = True
+        rospy.loginfo('%s: Succeeded' % self.action_name)
+        self.action_server.set_succeeded(result)
         
 
     ######################################################################################

@@ -25,26 +25,44 @@ class Foreman:
 
     def __init__(self):  
 
+        ###################################################################
+        ############################# ROS entities ########################
+        ###################################################################
+
         # initialize navigation client
-        self.navi_client = SimpleActionClient('navigation_action', NavigationAction)
+        self.navigation_client = SimpleActionClient('navigation_action', NavigationAction)
 
         # intialize rpr maniupulator client
         self.rpr_client = SimpleActionClient('rpr_manip_action', RPRManipulatorAction)
 
+        ###################################################################
+        ############################# CONSTANTS ###########################
+        ###################################################################
 
-        #### CONSTANTS ####
-        self.ROW_MAX = 5
-        self.COL_MAX = 5
+        # max limit of blocks along row and column space
+        self.ROW_MAX        = 4
+        self.COL_MAX        = 4
 
-        self.BLOCK_LENGTH = 1.5
-        self.BLOCK_WIDTH = 1.5
-        self.BLOCK_HEIGHT = 1.5
+        # conversion multiplier from inches to meters
+        self.INCH2METER     = 0.0254 
 
-        # preset values for block and build zones
-        self.block_zone_x = 2
-        self.block_zone_y = 3
-        self.build_zone_x = 5
-        self.build_zone_y = 5
+        # size dimensions of each block convetred from inches to meters 
+        self.BLOCK_LENGTH   = 1.5 * self.INCH2METER
+        self.BLOCK_WIDTH    = 1.5 * self.INCH2METER
+        self.BLOCK_HEIGHT   = 1.5 * self.INCH2METER
+
+        # built in spacing for blocks on build platform
+        self.BLOCK_SPACING  = 0.00936 # [m] (9.36 mm)
+
+
+        ###################################################################
+        ############################# CONSTANTS ###########################
+        ###################################################################
+        
+        # final waypoints in Global frame 
+        self.block_zone_final_waypoint = (0,0)  # corresponds with G-frame origin [m] 
+        self.build_zone_final_waypoint = (1,0)  # [m]
+        
 
         self.block_center_mask =  (self.BLOCK_WIDTH/2, self.BLOCK_LENGTH/2)  
 
@@ -53,27 +71,29 @@ class Foreman:
                 starting position in the build space which is the top left corner 
                 from the origin (0, ROW_MAX*BLOCK_LEN) + offset to estimate centroid of block top
         """
+
         self.current_block_ix = (0,0)
-        self.current_block_xy = self.setNextBlockCoordinate 
+        self.current_block_xy = self.setNextBlockCoordinate() 
 
-        #### blueprint object ####
-        # file path to raw blueprint excel file
-        self.fpath_blueprint_xlsx = '~/catkin_ws/src/electromagnetic_builder/blueprint_raw.xlsx'
+        ###################################################################
+        ############################# Blueprint ###########################
+        ###################################################################
 
-        # create blueprint object
-        self.blueprint = self.createBlueprint(self.fpath_blueprint_xlsx)
+        # use file path to raw blueprint excel file and create blueprint as np array
+        self.fpath_blueprint_xlsx   = '~/catkin_ws/src/electromagnetic_builder/blueprint_raw.xlsx'
+        self.blueprint              = self.createBlueprint(self.fpath_blueprint_xlsx)
 
         if (DEBUG):
             print('Blueprint matrix has been initialized.')
             print(self.blueprint)
-        
-    def createBlueprint(self, fpath):
 
+
+
+    def createBlueprint(self, fpath):
         """ construct blueprint """
         blueprint_raw = pd.read_excel(io=fpath) # read in excel file as panda data structure
         return np.array(blueprint_raw.values)   # convert to np array
  
-
 
     def getBlockTotal(self):
             total_sum = np.sum(self.blueprint)
@@ -84,7 +104,13 @@ class Foreman:
 
             return total_sum
 
+
+ 
+
     def setNextBlockIndex(self):
+        """ @note update the index to point to the next block within the blueprint.
+            if the current index is nonzero return since there is another block to place 
+                in the same position, otherwise move along columns first then row space  """
 
         # i - row index and base y-coordinate
         # j - column index and base x-coordinate
@@ -92,11 +118,11 @@ class Foreman:
         
         # check if there are blocks remaining to be stacked at this position
         if self.blueprint[i, j] != 0:
+            # dont adjust placement index
 
             if (DEBUG):
                 print("Blocks left at this index: ", self.blueprint[i, j])
             
-            # dont adjust placement index
             return 
 
         else:
@@ -116,7 +142,6 @@ class Foreman:
 
 
             self.current_block_ix = (i,j)   # update current index
-            self.setNextBlockCoordinate()   # update current x,y coordinate
 
             if(DEBUG):
                 print("updated block index: ", self.current_block_ix)
@@ -136,41 +161,34 @@ class Foreman:
         self.current_block_xy = (x, y)
 
     def requestNavigation(self, zone):
-        """ @note request grid navigation from navigation server """
+        """ @note request grid navigation from navigation server 
+            @param zone to navigate to, determines final waypoint requested """
 
         # intialize goal and result data type
-        action_result = NavigationResult()
-        nav_goal = NavigationGoal()
+        nav_result  = NavigationResult()
+        nav_goal    = NavigationGoal()
         
         # wait for server to prepare for goals
-        self.navi_client.wait_for_server()    
+        self.navigation_client.wait_for_server()    
 
+        # assign known values of goal waypoints
+        if zone == "block_zone":
+            nav_goal.x = self.block_zone_final_waypoint[0]
+            nav_goal.y = self.block_zone_final_waypoint[1]
 
-        if zone == "shimmy":
-            nav_goal.x = 0
-            nav_goal.y = 0
-            nav_goal.command = "shimmy"
+        elif zone =='build_zone':
+            nav_goal.x = self.build_zone_final_waypoint[0]
+            nav_goal.y = self.build_zone_final_waypoint[1]
 
-        else:
-
-            nav_goal.command = "grid_navigation"
-            
-            if zone == 'block_zone':
-                nav_goal.x = self.block_zone_x
-                nav_goal.y = self.block_zone_y
-            elif zone =='build_zone':
-                nav_goal.x = self.build_zone_x
-                nav_goal.y = self.build_zone_y
-        
         # send goal to action server and wait for completion
-        self.navi_client.send_goal(nav_goal) 
-        self.navi_client.wait_for_result()
+        self.navigation_client.send_goal(nav_goal) 
+        self.navigation_client.wait_for_result()
 
         # get result from server
-        action_result = self.navi_client.get_result()
+        nav_result = self.navigation_client.get_result()
 
         # return result to state machine
-        return action_result
+        return nav_result
 
 
 

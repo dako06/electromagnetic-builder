@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+
+
 import rospy
 from actionlib import SimpleActionServer 
 
@@ -43,19 +46,21 @@ class ManipulatorActionServer(object):
 
     
         #### report feedback ####
+        rospy.loginfo('%s recieved action request' % self.action_name)
       
 
         ##### execute action #####
         tmp = [1, 2, 3]
         tmp_array = Int32MultiArray(data=tmp)
         self.rpr_command_pub.publish(tmp_array)
+        rospy.loginfo('%s publishing goal %d, %d, %d.' % (self.action_name, tmp[0], tmp[1], tmp[2]))
 
 
         self.result.complete = True
 
         #### return result of action ####
 
-
+        rospy.loginfo('%s action succedded, exiting.' % self.action_name)
         self.action_server.set_succeeded(self.result)
 
 
