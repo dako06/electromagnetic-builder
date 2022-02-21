@@ -31,7 +31,7 @@ void setup()
   nh.subscribe(rpr_position_sub);
   
   // publisher for rpr joint states and joint debug
-  nh.advertise(rpr_joint_states_pub);
+//  nh.advertise(rpr_joint_states_pub);
   nh.advertise(joint_debug_pub);
 
 
@@ -47,19 +47,14 @@ void setup()
   /* builder: intialize joint messages and joint drivers */
   
   // intialize messages for rpr joint states and joint debug
-  initRPRJointStates();
+//  initRPRJointStates();
   initJointDebug();
 
   // intialize driver objects
   Init_Base_Servo();
 //  Init_Linear_Actuator();
-//  Init_End_Servo();
-
-  // joint test function
-  Test_Base();
-  // Test_LA();
-  // Test_End();
-
+  Init_End_Servo();
+  
   prev_update_time = millis();
   pinMode(LED_WORKING_CHECK, OUTPUT);
   setup_end = true;
@@ -71,7 +66,7 @@ void setup()
 void loop()
 {
   uint32_t t = millis();
-  unsigned long t_micros = micros();
+//  unsigned long t_micros = micros();
 
   updateTime();
   updateVariable(nh.connected());
@@ -133,10 +128,12 @@ void loop()
   /**********************************************************************/
 
   /* If there is a move command in the queue and the arm is not currently moving, start the next motion */
-  if (!(base_is_moving || LA_is_moving || end_is_moving)) {
-    if (!Arm_Move_Queue.isEmpty()) {
-      Prepare_Arm_Motion(Arm_Move_Queue.dequeue());
-    }
+  if (!(base_is_moving || end_is_moving)) // || LA_is_moving || end_is_moving)) {
+  {
+      if (!Arm_Move_Queue.isEmpty()) 
+      {
+        Prepare_Arm_Motion(Arm_Move_Queue.dequeue());
+      }
   }
 
   /* execute control of base and end servo of the RPR manipulator (T=90 ms) */ 
@@ -156,12 +153,15 @@ void loop()
     }
     
     /* end_is_moving is set true by whatever starts moving the arm, and is set false inside of End_Servo_Move_Callback */
-    //if (end_is_moving) {
-      //End_Servo_Move_Callback();
-    //} 
+    if (end_is_moving) {
+      End_Servo_Move_Callback();
+    } 
     
-    setRPRJointState();
-    publishRPRJointState();
+//    setRPRJointState();
+//    publishRPRJointState();
+    
+    setJointDebugMsg();
+    publishJointDebug();
 
     tTime[6] = t;
   }
@@ -173,12 +173,12 @@ void loop()
   //    tTimeMicros[0] = t_micros;
   //  }
 
-  if ((t-tTime[7]) >= 90)
-  {
-    setJointDebugMsg();
-    publishJointDebug();
-    tTime[7] = t;
-  }
+//  if ((t-tTime[7]) >= 500)
+//  {
+//    setJointDebugMsg();
+//    publishJointDebug();
+//    tTime[7] = t;
+//  }
 
 
 
@@ -221,21 +221,22 @@ void loop()
 /****************** electromagnetic builder function definitions ********************/
 /************************************************************************************/
 
-/** @param linear_actuator_joint_msg - message containing coordinates for linear actuator to execute
- *  @note callback function to respond to movement commands from the remote PC  */
-
-
-/** @param servo_msg - message containing coordinates for base and end servo to execute
- *  @note callback function to respond to movement commands from the remote PC  */
-
 void RPRJointCallback(const std_msgs::Int32MultiArray& joint_goal_request)
 {
-//   if (is_moving == false)
-//  {
-//    servo_goal = servo_msg;
-//  }
-//  is_moving == true;
-  rpr_joint_goal = joint_goal_request;
+
+  static bool first_test = true;
+  if (Arm_Move_Queue.isEmpty())
+  {
+    if (first_test)
+    {
+      //Test_Base();
+      Test_End();
+      first_test = false;
+    }
+    
+    // assign update to arm command queue
+    // rpr_joint_goal = joint_goal_request;
+  }
 }
 
 /** @note function called in software timer to handle direct actuator movement */
@@ -256,7 +257,6 @@ void JointControl(void)
 
 
 /** @note this function intializes the joint state message for adjustment throughout execution */
-
 void  initRPRJointStates()
 {
   static char *rpr_joint_states_name[] = {"BASE_SERVO", "LINEAR_ACTUATOR", "END_SERVO"}; 
@@ -265,18 +265,17 @@ void  initRPRJointStates()
   rpr_joint_states.position_length = 3;
   rpr_joint_states.velocity_length = 3;
   rpr_joint_states.effort_length = 3;
-
   
-  static float rpr_joint_states_pos[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
-  static float rpr_joint_states_vel[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
+  static float rpr_joint_states_pos[RPR_JOINT_NUM]  = {0.0, 0.0, 0.0};
+  static float rpr_joint_states_vel[RPR_JOINT_NUM]  = {0.0, 0.0, 0.0};
+  static float rpr_joint_states_eff[RPR_JOINT_NUM]  = {0.0, 0.0, 0.0};
 
   rpr_joint_states.position = rpr_joint_states_pos;
   rpr_joint_states.velocity = rpr_joint_states_vel;
-
+  rpr_joint_states.effort   = rpr_joint_states_eff;
 }
 
 /** @note this function publish the joint state message to the remote pc */
-
 void publishRPRJointState()
 {
   ros::Time stamp_now = rosNow();
@@ -285,20 +284,18 @@ void publishRPRJointState()
 }
 
 /** @note this function sets the joint state message for the rpr manipulator to prepare for publishing */
-
 void setRPRJointState()
 {
- 
   // prepare updates for each field
-  static float rpr_joint_states_pos[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
-  static float rpr_joint_states_vel[RPR_JOINT_NUM] = {0.0, 0.0, 0.0};
-  //static float joint_states_eff[RPR_JOINT_NUM] = {0.0, 0.0};
+  static float rpr_joint_states_pos[RPR_JOINT_NUM]  = {0.0, 0.0, 0.0};
+  static float rpr_joint_states_vel[RPR_JOINT_NUM]  = {0.0, 0.0, 0.0};
+  static float rpr_joint_states_eff[RPR_JOINT_NUM]  = {0.0, 0.0, 0.0};
 
   float base_servo_pos = static_cast<float>(base_curr_position);
 //  float LA_pos = static_cast<float>(LA_curr_position);
 //  float end_servo_pos = static_cast<float>(end_curr_position);
 
-  // temp hard coded for test
+  // assign updates to joint state fields
   rpr_joint_states_pos[0] = base_servo_pos;
   rpr_joint_states_pos[1] = 0; //LA_pos;
   rpr_joint_states_pos[2] = 0; //end_servo_pos;
@@ -307,11 +304,14 @@ void setRPRJointState()
   rpr_joint_states_vel[1] = 0.0;
   rpr_joint_states_vel[2] = 0.0;
 
+  rpr_joint_states_eff[0] = 0.0;
+  rpr_joint_states_eff[1] = 0.0;
+  rpr_joint_states_eff[2] = 0.0;
+
   // assign values to msg fields
   rpr_joint_states.position = rpr_joint_states_pos;
   rpr_joint_states.velocity = rpr_joint_states_vel;
-  // rpr_joint_states.effort = ;
-
+  rpr_joint_states.effort   = rpr_joint_states_eff;
 }
 
 
@@ -323,11 +323,9 @@ void initJointDebug()
   tmp_debug[0] = 0.0;
   tmp_debug[1] = 0.0;
   tmp_debug[2] = 0.0;
-  
   tmp_debug[3] = 0.0;
   tmp_debug[4] = 0.0;
   tmp_debug[5] = 0.0;
-  
   tmp_debug[6] = 0.0;
   tmp_debug[7] = 0.0;
   tmp_debug[8] = 0.0;
@@ -340,21 +338,23 @@ void initJointDebug()
 void setJointDebugMsg()
 {
   static long tmp_debug[DEBUG_LENGTH];  
- 
+  uint32_t q_size =  Arm_Move_Queue.itemCount();
+  
+  // assign variables for each joint
   tmp_debug[0] = base_curr_position;
   tmp_debug[1] = base_goal_position;
   tmp_debug[2] = base_is_moving;
+  tmp_debug[3] = static_cast<long>(q_size); //LA_curr_position;
   
-  tmp_debug[3] = 0;//LA_curr_position;
-  tmp_debug[4] = 0;//LA_goal_position;
+  
+  tmp_debug[4] = 0;       //LA_goal_position;
   tmp_debug[5] = 0;//LA_is_moving;
-  
-  tmp_debug[6] = 0;//end_curr_position;
-  tmp_debug[7] = 0;//end_goal_position;
-  tmp_debug[8] = 0;//end_is_moving;
+  tmp_debug[6] = end_curr_position;
+  tmp_debug[7] = end_goal_position;
+  tmp_debug[8] = end_is_moving;
 
-  // assign temp values to global message 
-  joint_debug_array.data = tmp_debug;
+  // update message for publishing 
+  joint_debug_array.data        = tmp_debug;
   joint_debug_array.data_length = DEBUG_LENGTH;
 }
 
