@@ -113,11 +113,12 @@ class NavigationActionServer(object):
     def get_path_from_A_star(self, start, goal, obstacles):
         """
         @param start        - integer 2-tuple of the current grid, e.g., (0, 0)
-        @param goal         - integer 2-tuple  of the goal grid, e.g., (5, 1)
+        @param goal         - integer 2-tuple of the goal grid, e.g., (5, 1)
         @param obstacles    - a list of grids marked as obstacles, e.g., [(2, -1), (2, 0), ...]
         @return path        - a list of grids connecting start to goal, e.g., [(1, 0), (1, 1), ...]
                                 note that the path should contain the goal but not the start
-                                e.g. path from (0, 0) to (2, 2) should be [(1, 0), (1, 1), (2, 1), (2, 2)]  """
+                                e.g. path from (0, 0) to (2, 2) should be [(1, 0), (1, 1), (2, 1), (2, 2)] 
+        @note               - implementation assumes a grid cell size of 0.5m to complement size of turtlebot """
 
         # initialize data structures
         open_list = [start]     # nodes to explore
@@ -138,7 +139,7 @@ class NavigationActionServer(object):
                 
                 node = goal
 
-                #reconstruct path from final node
+                # reconstruct path from final node using parent dict
                 while node != start:
                     path.insert(0,node)
                     node = parent[node]
@@ -239,7 +240,7 @@ class NavigationActionServer(object):
         return a #a3, a2, a1, a0
 
     def neighbors(self, current):
-        # define the list of 4 neighbors
+        # define the list of 4-connectivity neighbors
         neighbors = [(1, 0), (-1, 0), (0, 1), (0, -1) ,]  # right, left, up, down
         return [ (current[0] +nbr[0], current[1] +nbr[1]) for nbr in neighbors ]
 

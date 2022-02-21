@@ -72,7 +72,7 @@ class evaluateBuildStatus(smach.State):
         else:
             
             foreman.setNextBlockIndex()         # update block index to prepare for next block
-            foreman.setNextBlockCoordinate()    # update current associated x,y coordinate based on block index
+            # foreman.setNextBlockCoordinate()    # update current associated x,y coordinate based on block index
 
             # pass input key to navigation state to request movement to blockzone
             userdata.eval_nav_request = "block_zone"    
@@ -128,10 +128,12 @@ class extractBlock(smach.State):
     def __init__(self):
         # intialize state class and its outcomes   
         smach.State.__init__(self, outcomes=['block_secured', 'extraction_failure'],
-                                    input_keys=['extraction_nav_request'])
+                                    output_keys=['extraction_nav_request'])
         
     def execute(self, userdata):
 
+
+        userdata.extraction_nav_request = "build_zone"
 
         return 'block_secured'
         # return 'extraction_failure'
