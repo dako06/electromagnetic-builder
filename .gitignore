@@ -1,7 +1,4 @@
-
 *.pyc
-*.xlsx
 .vscode/
-
 __pycache__/
 

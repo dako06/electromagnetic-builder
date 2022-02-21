@@ -20,6 +20,7 @@ import numpy as np
 # import supplemental classes
 from controller import Controller
 
+
 class NavigationActionServer(object):
     
     def __init__(self, name):
@@ -48,12 +49,16 @@ class NavigationActionServer(object):
         self.odom_sub = rospy.Subscriber("odom", Odometry, self.odom_callback)
 
         # intialize variables used for grid navigation
-        self.vel_ref = 0.3
-        self.previous_waypoint = [0,0]
-        self.previous_velocity = [0,0]
-        self.trajectory = list()
-        self.obstacles = []             # list of tuples encoding obstacles in grid
-        # TODO init and have a way to update obstacles if needed
+        self.vel_ref            = 0.3       # reference velocity [m/s]
+        self.previous_waypoint  = [0,0]     # previous waypoint memory used for time scaling
+        self.previous_velocity  = [0,0]     # previous velocity memory used for time scaling
+        self.start              = (0,0)     # starting node used during A* path planning
+
+        # list of tuples encoding obstacles in grid
+        self.obstacles = [(3,1), (1,1), 
+                    (-1,-1), (-1,0), (-1,1), (-1,2), (-1,3), (-1,4), (-1, 5), 
+                    (3,-1), (3,0), (3,1), (3,2), (3,3), (3,4), (3,5),
+                    (0,-1), (1,-1), (2,-1), (0,5), (1,5), (2,5)] 
 
         
     
@@ -67,14 +72,16 @@ class NavigationActionServer(object):
         ##### execute action #####
     
         # prepare start and goal as a tuple representing cells in grid
-        start_cell  = (0,0) # TODO have a way to retrieve start based on current position
+        # TODO have a way to retrieve start based on current position
+        start_cell  = self.start 
+        obstacles   = self.obsacles
         goal_cell   = (goal.x, goal.y)
 
-        # get way points using A*
-        waypoints       = self.get_path_from_A_star(start_cell, goal_cell, self.obstacles)
+        # get list of way points using A*
+        waypoints       = self.get_path_from_A_star(start_cell, goal_cell, obstacles)
         waypoint_cnt    = len(waypoints)
 
-        # confirm waypoints is valid for movement
+        # confirm waypoints is valid
         if waypoint_cnt == 0:
         
             rospy.loginfo('%s: Waypoints were not succesfully found.\nExiting server.' % self.action_name)
@@ -82,10 +89,11 @@ class NavigationActionServer(object):
             self.action_server.set_aborted()
         
         else:
+
+            # append last value for smooth end
             waypoints.append(waypoints[-1])
             rospy.loginfo('%s: Waypoints succesfully found.\nThere are %d waypoints to traverse.' % (self.action_name, waypoint_cnt))
 
-	
         for i in range(waypoint_cnt-1):
 
             # check for preempt request from client 
@@ -172,58 +180,56 @@ class NavigationActionServer(object):
             @param next_waypoint
         """
         
-        self.controller.setPD(5,0) # set P and D coeffecients of PD controller 
-        T = 2                   # time parametarize path with t in [0, T]
+        T = 2                       # time parametarize path with t in [0, T]
+        self.controller.setPD(5,0)  # set P and D coeffecients of PD controller 
 
-        # boundary conditions
-        # position boundary
-        Px_start = self.previous_waypoint[0] #sets starting x position to prev waypoint
-        Py_start = self.previous_waypoint[1] #sets starting y position to prev waypoint
-        Px_end = current_waypoint[0] #sets desired x position to current waypoint
-        Py_end = current_waypoint[1] #sets desired y position to current waypoint
+        # position boundary conditions
+        Px_start    = self.previous_waypoint[0] # sets starting x position 
+        Py_start    = self.previous_waypoint[1] # sets starting y position 
+        Px_end      = current_waypoint[0]       # sets desired x position 
+        Py_end      = current_waypoint[1]       # sets desired y position 
         
-        #velocity boundary
-        Vx_start = self.previous_velocity[0] #inital velocity constraints x component
-        Vy_start = self.previous_velocity[1] #inital velocity constraints y component
+        # velocity boundary conditions
+        Vx_start = self.previous_velocity[0]    # inital velocity constraints x component
+        Vy_start = self.previous_velocity[1]    # inital velocity constraints y component
         
-        diff_x = next_waypoint[0] - self.previous_waypoint[0] #difference between previous and next waypoint of x
-        diff_y = next_waypoint[1] - self.previous_waypoint[1] #diff. between previous and next waypoint for y
+        dx = next_waypoint[0] - self.previous_waypoint[0] # distance in x from previous to next waypoint 
+        dy = next_waypoint[1] - self.previous_waypoint[1] # distance in y from previous to next waypoint
 
-        angle = atan2(diff_y,diff_x) # angle between previous and next waypoint
-        Vx_end = self.vel_ref*cos(angle) #final velocity constraints x component
-        Vy_end = self.vel_ref*sin(angle) #final velocity constraints y component
+        theta   = atan2(dy, dx)              # angle between previous and next waypoint
+        Vx_end  = self.vel_ref*cos(theta)    # final velocity constraint on x component
+        Vy_end  = self.vel_ref*sin(theta)    # final velocity constraint on y component
  
-        #3rd polynomial coefficients for x and y axis for necessary trajectory
+        # get 3rd order polynomial coefficients of x and y axis for trajectory
         coeff_x = self.polynomial_time_scaling_3rd_order(Px_start, Vx_start, Px_end, Vx_end, T)
         coeff_y = self.polynomial_time_scaling_3rd_order(Py_start, Vy_start, Py_end, Vy_end, T)
         
 
         for i in range(T*10):
-            #time scaling by 0.1
-            t = i*0.1
+            
+            t = i*0.1   # time scale discrete time elements by t
 
-            #desired velocity at time t
-            v_x = np.dot(coeff_x,[3*t**2,2*t,1,0]) #calculate x component of v
-            v_y = np.dot(coeff_y,[3*t**2,2*t,1,0]) #calculate y component of v
-            self.vel.linear.x = sqrt(v_x**2+v_y**2)
+            # desired velocity at time t
+            v_x                 = np.dot(coeff_x,[3*t**2,2*t,1,0])  # x component of v
+            v_y                 = np.dot(coeff_y,[3*t**2,2*t,1,0])  # y component of v
+            self.vel.linear.x   = sqrt(v_x**2+v_y**2)               # update Twist
        
-            #use PD controller to set angle
-            angle = atan2(v_y, v_x) #calculate desired angle
+            theta = atan2(v_y, v_x) # calculate desired angle
 
-            #adjusting for negative angles
-            if angle <= 0 and self.pose.theta >= 0 and self.pose.theta - angle >= pi:
-                angle += 2*pi
-            elif angle > 0 and self.pose.theta < 0 and angle - self.pose.theta > pi:  
-                angle -= 2*pi
+            # adjust for negative angles
+            if theta <= 0 and self.pose.theta >= 0 and self.pose.theta - theta >= pi:
+                theta += 2*pi
+            elif theta > 0 and self.pose.theta < 0 and theta - self.pose.theta > pi:  
+                theta -= 2*pi
             else:
                 pass    
 
-            self.controller.setPoint(angle)    # set desired angle      
-            self.vel.angular.z = self.controller.update(self.pose.theta) #update angular velocity to be Kp*error where error = angle - self.pose.theta)
-            self.vel_pub.publish(self.vel)
+            self.controller.setPoint(theta)                                 # set desired angle in controller      
+            self.vel.angular.z = self.controller.update(self.pose.theta)    # update angular velocity to be Kp*error where error = theta - self.pose.theta
+            self.vel_pub.publish(self.vel)                                  # publish Twist
             self.rate.sleep()
 
-        #update previous velocities and positions with current v and positions
+        # update previous velocities and positions with current to prepare for next waypoint
         self.previous_waypoint[0] = Px_end
         self.previous_waypoint[1] = Py_end
         self.previous_velocity[0] = v_x
@@ -240,13 +246,13 @@ class NavigationActionServer(object):
         return a #a3, a2, a1, a0
 
     def neighbors(self, current):
-        # define the list of 4-connectivity neighbors
-        neighbors = [(1, 0), (-1, 0), (0, 1), (0, -1) ,]  # right, left, up, down
+        # return a list of 4-connectivity neighbors
+        neighbors = [(1, 0), (-1, 0), (0, 1), (0, -1) ,]  # 4-connectivity mask
         return [ (current[0] +nbr[0], current[1] +nbr[1]) for nbr in neighbors ]
 
     def heuristic_distance(self, candidate, goal):
+        # l2-norm used as heuristic
         return sqrt((candidate[0] - goal[0])**2 + (candidate[1] - goal[1])**2)
-
 
     def odom_callback(self, msg):
         # get pose = (x, y, theta) from odometry topic

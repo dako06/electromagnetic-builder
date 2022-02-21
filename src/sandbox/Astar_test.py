@@ -1,3 +1,5 @@
+
+from math import pi, sqrt, atan2, cos, sin
 import numpy as np 
 
 class Astar():
@@ -5,8 +7,13 @@ class Astar():
     def __init__(self, start, obstacles):
         self.start = start
         self.obsacles = obstacles
+        self.controller = Controller()
 
-    
+        self.vel_ref = 0.3
+        self.previous_waypoint = [0,0]
+        self.previous_velocity = [0,0]
+        self.trajectory = list()
+
     def run(self, goal):
 
 
@@ -40,8 +47,8 @@ class Astar():
         # iterate over nodes remaining to explore
         while open_list: 
             
-            current = open_list.pop(0)   # assign the first node to explore as current 
-            closed_list.append(current)  # list current node (first node) as explored
+            current = open_list.pop(0)   # assign node at front of list as current 
+            closed_list.append(current)  # add current to explored
 
             # check if goal is reached
             if current == goal:  
@@ -73,6 +80,13 @@ class Astar():
         # return empty list if failed
         return []
 
+    def neighbors(self, current):
+        # return a list of 4-connectivity neighbors
+        neighbors = [(1, 0), (-1, 0), (0, 1), (0, -1) ,]  # right, left, up, down
+        return [ (current[0] +nbr[0], current[1] +nbr[1]) for nbr in neighbors ]
+
+    def heuristic_distance(self, candidate, goal):
+        return sqrt((candidate[0] - goal[0])**2 + (candidate[1] - goal[1])**2)
 
     def move_to_point(self, current_waypoint, next_waypoint): 
         """ @note generate polynomial trajectory and move to current_waypoint next_waypoint is to 
@@ -80,9 +94,11 @@ class Astar():
             @param current_waypoint
             @param next_waypoint
         """
+        # TODO need a way to get previous waypoint live after position for block positioning
+        # also a way to get previous velocity, or this can be set to zero always
         
-        self.controller.setPD(5,0) # set P and D coeffecients of PD controller 
-        T = 2                   # time parametarize path with t in [0, T]
+        T = 2                       # time parametarize path with t in [0, T]
+        self.controller.setPD(5,0)  # set P and D coeffecients of PD controller 
 
         # boundary conditions
         # position boundary
@@ -182,5 +198,6 @@ if __name__ == '__main__':
 
 
     star = Astar(START, OBSTACLES)
+    star = star.run(GOAL)
 
 
