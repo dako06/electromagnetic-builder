@@ -2,7 +2,7 @@
 #define RPR_LINEAR_ACTUATOR_H_
 
 //UART used to communicate with the Arduino Uno controlling the linear actuator
-#define LA_CNTRL_SERIAL Serial2
+#define LA_CNTRL_SERIAL Serial4
 
 /*** Incoming messages ***/
 // When the Uno is sending the current position of the linear actuator to the OpenCR, it sends this byte first
