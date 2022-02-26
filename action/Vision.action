@@ -1,0 +1,9 @@
+#goal definition
+string command
+---
+#result definition
+bool successful
+float32[] values
+---
+#feedback
+float32 percent_complete
