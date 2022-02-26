@@ -190,6 +190,11 @@ void Prepare_LA_Move_Task(LA_Move_Command LA_cmd) {
       break;
     case BLOCK_PLACE_MODE:
       // Todo: send mode change message and then setup the goal velocity
+      block_place_mode = true;
+      LA_CNTRL_SERIAL.write(SET_MODE_BLOCK_PLACE_MSG);
+      // The target velocity will be updated over time when in block place mode,
+        // this just sends the initial value
+      LA_Update_Pulse_Width();
       break;
     case HOMING_MODE:
       Start_LA_Homing();
@@ -199,16 +204,6 @@ void Prepare_LA_Move_Task(LA_Move_Command LA_cmd) {
   }
   LA_goal_position = goal_position;
   LA_Send_Goal_Position(goal_position);
-  // if (LA_cmd.move_mode == BLOCK_PLACE_MODE) {
-  //   block_place_mode = true;
-  //   float vel_to_match = BASE_DEFAULT_VEL * (L0 + LA_Pos_mm()) * base_angle_tan;
-  //   // Send goal velocity command
-  //   //LA_curr_pulse_width = LA_Vel_To_Pulse_Width(vel_to_match);
-  // }
-  // else {
-  //   //LA_Set_Accel_Parameters(LA_cmd.vel_in_mm_per_sec);
-  //   block_place_mode = false;
-  // }
 }
 
 // It is assumed that the next two bytes on the serial buffer store the current position information
@@ -233,51 +228,21 @@ void LA_Send_Goal_Position(unsigned int goal_position) {
   LA_CNTRL_SERIAL.write(goal_position_upper_7);
 }
 
-//void LA_Update_Pulse_Width() {
-//  // In order to cut down on unnecessary calculations, the velocity to match is only calculated on every 100 executions
-//    // of this function; the velocity is still updated on every execution however
-//  static unsigned long vel_update_counter = 0;
-//  static unsigned int pulse_width_to_match = LA_MAX_PULSE_WIDTH;
-//  vel_update_counter = LA_is_moving ? (vel_update_counter + 1) : 0;
-//  if (block_place_mode) {
-//    if (vel_update_counter % 100 == 0) {
-//      float vel_to_match = BASE_DEFAULT_VEL * (L0 + LA_Pos_mm()) * base_angle_tan;
-//      pulse_width_to_match = LA_Vel_To_Pulse_Width(vel_to_match);
-//    }
-//    if (abs(LA_curr_pulse_width - pulse_width_to_match) <= LA_accel_rate) {
-//      LA_curr_pulse_width = pulse_width_to_match;
-//    }
-//    else {
-//      if (LA_curr_pulse_width > pulse_width_to_match) {
-//        LA_curr_pulse_width -= LA_accel_rate;
-//      }
-//      else if (LA_curr_pulse_width < pulse_width_to_match) {
-//        LA_curr_pulse_width += LA_accel_rate;
-//      }
-//    }
-//  }
-//  else {
-//    if (LA_is_accelerating) {
-//      LA_curr_pulse_width -= std::min(LA_curr_pulse_width - LA_goal_pulse_width, LA_accel_rate);
-//      if (LA_curr_pulse_width <= LA_goal_pulse_width) {
-//        LA_is_accelerating = 0;
-//      }
-//    }
-//    else if (LA_is_decelerating) {
-//      LA_curr_pulse_width += std::min(LA_goal_pulse_width - LA_curr_pulse_width, LA_accel_rate);
-//      if (LA_curr_pulse_width >= LA_goal_pulse_width) {
-//        LA_is_decelerating = 0;
-//      }
-//    }
-//  }
-// // Just to be safe
-//  if (LA_curr_pulse_width < LA_MIN_PULSE_WIDTH) {
-//    LA_curr_pulse_width = LA_MIN_PULSE_WIDTH;
-//  }
-//  if (LA_curr_pulse_width > LA_MAX_PULSE_WIDTH) {
-//    LA_curr_pulse_width = LA_MAX_PULSE_WIDTH;
-//  }
-//}
+void LA_Update_Pulse_Width() {
+ // In block place mode, this function sends the new required pulse width in microseconds to the Uno
+  // for it to attempt to match
+ // Note that the actual pulse width that is being used at any given time is controlled by the Uno's
+  // program and does nto always match this pulse width
+ // In order to cut down on calculations, the velocity to match is only calculated on every 100 executions
+   // of this function
+  static unsigned long vel_update_counter = 0;
+  vel_update_counter = LA_is_moving ? (vel_update_counter + 1) : 0;
+  if (vel_update_counter % 100 == 0) {
+    float vel_to_match = BASE_DEFAULT_VEL * (L0 + LA_Pos_mm()) * base_angle_tan;
+    unsigned int pulse_width_to_match = LA_Vel_To_Pulse_Width(vel_to_match);
+    LA_Send_Goal_Position(pulse_width_to_match);
+  }
+}
 
 float LA_Pos_mm() {
  return (float)LA_curr_position * 0.01;

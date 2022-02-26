@@ -41,13 +41,6 @@
                 // the linear actuator fully retracted
 unsigned int LA_curr_position;
 unsigned int LA_goal_position;
-// Add variables for storing velocity in mm per second
-// unsigned int LA_accel_rate;
-// unsigned int LA_curr_pulse_width;
-// unsigned int LA_goal_pulse_width;
-// int LA_move_dir; // 1 for forwards, -1 for reverse
-// bool LA_is_accelerating;
-// bool LA_is_decelerating;
 bool block_place_mode;
 bool LA_is_moving{false}; // flag to tell if the task has completed
 bool LA_is_homing;
