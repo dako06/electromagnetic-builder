@@ -71,9 +71,9 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate actions in the 'action' folder
 add_action_files(
   DIRECTORY action
-  FILES Navigation.action
   FILES RPRManipulator.action
-)
+  FILES Vision.action
+ )
 
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
@@ -114,10 +114,10 @@ generate_messages(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES electromagnetic-builder
-  CATKIN_DEPENDS actionlib_msgs # actionlib  # nav_msgs roscpp rospy sensor_msgs std_msgs
-#  DEPENDS system_lib
+  INCLUDE_DIRS include
+  LIBRARIES electromagnetic_builder
+  CATKIN_DEPENDS actionlib_msgs std_msgs roscpp rospy sensor_msgs  # actionlib 
+  DEPENDS system_lib
 )
 
 ###########
@@ -136,6 +136,12 @@ include_directories(
 #   src/${PROJECT_NAME}/electromagnetic-builder.cpp
 # )
 
+
+# scan ROS node
+add_executable(scan_node_cpp src/scan_node.cpp)
+target_link_libraries(scan_node_cpp ${catkin_LIBRARIES})
+
+
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
@@ -145,6 +151,7 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/electromagnetic-builder_node.cpp)
+
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -156,10 +163,15 @@ include_directories(
 ## same as for the library above
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
+
+
 ## Specify libraries to link a library or executable target against
 # target_link_libraries(${PROJECT_NAME}_node
 #   ${catkin_LIBRARIES}
 # )
+
+
+
 
 #############
 ## Install ##

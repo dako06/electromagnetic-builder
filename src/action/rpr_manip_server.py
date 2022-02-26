@@ -23,19 +23,14 @@ class ManipulatorActionServer(object):
 
         # publish commands to RPR module on openCR
         self.rpr_command_pub = rospy.Publisher("rpr_joint_trajectory", Int32MultiArray, queue_size=10)
-
-
-        #### action messages ####
-        self.result     = RPRManipulatorResult()
-        self.feedback   = RPRManipulatorFeedback()
-
-        # rpr goal command
-        # self.rpr_command = Int32MultiArray()
-
+            
 
        
 
     def execute_callback(self, goal):
+
+        result     = RPRManipulatorResult()
+        feedback   = RPRManipulatorFeedback()
         
         r = rospy.Rate(10)
 
@@ -52,16 +47,17 @@ class ManipulatorActionServer(object):
         ##### execute action #####
         tmp = [1, 2, 3]
         tmp_array = Int32MultiArray(data=tmp)
-        self.rpr_command_pub.publish(tmp_array)
         rospy.loginfo('%s publishing goal %d, %d, %d.' % (self.action_name, tmp[0], tmp[1], tmp[2]))
 
+        while 1:
+            self.rpr_command_pub.publish(tmp_array)
+        
 
-        self.result.complete = True
 
-        #### return result of action ####
-
+        # return result of action 
+        result.complete = True
         rospy.loginfo('%s action succedded, exiting.' % self.action_name)
-        self.action_server.set_succeeded(self.result)
+        self.action_server.set_succeeded(result)
 
 
 if __name__ == '__main__':
