@@ -9,96 +9,92 @@ class ImageProcessor:
     def __init__(self) -> None:
 
         # HSV color lower and upper thresholds  
+        self.block_filter_HSV = np.array(([110, 100, 20], [125, 255, 255]), dtype = "uint8")      
         self.color_workspace = np.array(([170, 80, 20], [180, 255, 255]), dtype = "uint8")   
-        self.color_block = np.array(([110, 100, 20], [125, 255, 255]), dtype = "uint8")      
         self.color_buildsite = np.array(([165, 90, 20], [170, 200, 255]), dtype = "uint8")  
-        self.REFRESH = 10 # refresh rate of 10 seconds
+
+        # threshold used for filtering single block during pixel component analysis (element 0 is min and element 1 is max)
+        self.block_pixel_thresh = {'width':(50,70), 'height':(50,70), 'area':(2700,3100)}
 
 
-    #### functions for image type conversions ####
-    def convert_bgr2rgb(self, img_bgr):
-        return cv.cvtColor(img_bgr, cv.COLOR_BGR2RGB)
+    def compoundOpenImage(self, src):
 
-    def convert_bgr2grayscale(self, img_bgr):
-        return cv.cvtColor(img_bgr, cv.COLOR_BGR2GRAY)
-
-
-
-    """
-    Display an image with the given title until any key is pressed,
-    press s to save the image  
-    """
-    def displayImg(self, window_name, img, save_as):
-        """ @param title    - name given to image in cv window
-            @param img      - image object to display
-            @param save_as  - (string) name to save image as
-            @note press s key during display to save image  """
-
-        # display and wait for key
-        cv.imshow(window_name, img)     
-        key = cv.waitKey(0)      
-               
-        # save image if requested
-        if key==ord("s"):
-            cv.imwrite(save_as, img)    
-        
-        # cv.destroyAllWindows()
-
-    def displayImgProperties(self, img):
-        print("Image Properties:")
-        print("\tRows, columns, channels: ", img.shape)
-        print("\tTotal element count: ", img.size)
-        print("\tThe data type used to represent each pixel is: ", img.dtype)
+        img_erosion     = self.applyErosion(4, src, "cross")
+        opened_img      = self.applyDilation(2, img_erosion, "rectangle")
+        return opened_img
 
     def getConnectedComponents(self, img_binary, connectivity):
-        """
-        @param binary - binary thresholded image
-        @param connectivity - 4 is diamond neighboorhood, 8 is square neighboorhood
-        @param filter - 0 return all components, 1- filter based on constraint
-        @return 4tuple - (count, label, stats, centroids)
-        count - number of components
-        label - size of image, each element has a value equal to its label
-        stats - nx5 matrix containing stats
-        centroids - nx2 matrix containing centroid
-        """
+        """ @param binary - binary thresholded image
+            @param connectivity - 4 is diamond neighboorhood, 8 is square neighboorhood
+            @param filter - 0 return all components, 1- filter based on constraint
+            @return 4tuple - (count, label, stats, centroids)
+                            count - number of components
+                            label - same dim as image, each element consists of an int indicating the component it belongs to
+                            stats - nx5 matrix containing stats
+                            centroids - nx2 matrix containing centroid
+            @note returns all connected components (first component is always the background) """
+
         if (connectivity != 4 and connectivity != 8):
             connectivity = 8
 
-        output = cv.connectedComponentsWithStats(img_binary, connectivity, cv.CV_32S)
-        return output
-        # first connected component is always the background
-  
-    def filterComponents(self, component_tup):
-        """
-        @param component_tup - 4-tuple containing connected component and its stats
-        """
-        (n, label_matrix, stats, centroids) = component_tup
+        (numLabels, labels, stats, centroids) = cv.connectedComponentsWithStats(img_binary, connectivity, cv.CV_32S)
         
-        BLOCK_WIDTH_THRESH = (50,70)
-        BLOCK_HEIGHT_THRESH = (50,70)
-        BLOCK_AREA_THRESH = (2700,3100)
+        return (numLabels, labels, stats, centroids)
+        
+  
+    def filterComponents(self, comp_tuple, threshold):
+        """ @param comp_tuple:      4-tuple containing connected components and there statistics
+            @param threshold:       threshold used for filtering as a dict
+            @note accessing stats:  x = stats[i, cv2.CC_STAT_LEFT]      - starting x coordinate of the component
+	                                y = stats[i, cv2.CC_STAT_TOP]       - starting y coordinate of the component
+	                                w = stats[i, cv2.CC_STAT_WIDTH]     - width of the component
+	                                h = stats[i, cv2.CC_STAT_HEIGHT]    - height of the component
+	                                area = stats[i, cv2.CC_STAT_AREA]   - area (in pixels)  """
+        
+        # get boundaries from dictionary
+        (min_width, max_width)      = threshold.get('width')
+        (min_height, max_height)    = threshold.get('height')
+        (min_area, max_area)        = threshold.get('area')
 
-        for i in range(0, n):
+        # unpack connected component tuple 
+        (label_count, label_matrix, stats, centroids) = comp_tuple
 
-                w = stats[i, cv.CC_STAT_WIDTH]
-                h = stats[i, cv.CC_STAT_HEIGHT]
-                area = stats[i, cv.CC_STAT_AREA]
-                if (w < BLOCK_WIDTH_THRESH[0] or w > BLOCK_WIDTH_THRESH[1]): 
-                    continue
-                if (h < BLOCK_HEIGHT_THRESH[0] or h > BLOCK_HEIGHT_THRESH[1]): 
-                    continue                 
-                if (area < BLOCK_AREA_THRESH[0] or area > BLOCK_AREA_THRESH[1]): 
-                    continue 
+        # iterate over number of components (hard coded to ignore background)
+        for i in range(1, label_count):
 
-                # store this components x and y in stats matrix
-                xy_tup = (stats[i, cv.CC_STAT_LEFT], stats[i, cv.CC_STAT_TOP])
+            w = stats[i, cv.CC_STAT_WIDTH]
+            h = stats[i, cv.CC_STAT_HEIGHT]
+            area = stats[i, cv.CC_STAT_AREA]
 
-                wh_tup = (w, h)                 # store width and height
-                centroid_tup = (centroids[i])   # store this components centroid
+            if (w < min_width or w > max_width):
+                continue
+            if (h < min_height or h > max_height): 
+                continue                 
+            if (area < min_area or area > max_area): 
+                continue 
 
-                component_mask = (label_matrix == i).astype("uint8") * 255
+            x = stats[i, cv.CC_STAT_LEFT]
+            y = stats[i, cv.CC_STAT_TOP]
+
+            # store this components x and y in stats matrix
+            xy_tup = (stats[i, cv.CC_STAT_LEFT], stats[i, cv.CC_STAT_TOP])
+
+            wh_tup = (w, h)                 # store width and height
+
+            (c_x, c_y) = (centroids[i]) # store this components centroid
+
+            component_mask = (label_matrix == i).astype("uint8") * 255
+
+            # cv.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 3)
+            # cv.circle(img, (int(cX), int(cY)), 4, (0, 0, 255), -1)
                 
-                return [xy_tup, wh_tup, centroid_tup], component_mask  
+            print("x, y :", xy_tup)                
+            print("w, h :", wh_tup) 
+            print("centroid : %f, %f" % (c_x, c_y)) 
+            print("component_mask :", component_mask) 
+                
+
+            return [xy_tup, wh_tup, (c_x, c_y)], component_mask  
 
 
     def filterColor(self, img_bgr, lower, upper):
@@ -140,6 +136,7 @@ class ImageProcessor:
         return cv.dilate(src, element)
 
 
+
     def findBlock(self, src):
 
         mask = self.filterColor(src, self.color_block[0], self.color_block[1])
@@ -151,10 +148,6 @@ class ImageProcessor:
         bounding_rect = cv.rectangle(src, (x, y), (x + w, y + h), (0, 255, 0), 3)
 
 
-    def GUI(self, window_name, img):
-
-        cv.imshow('image', img)
-        k = cv.waitKey(self.REFRESH)
 
     ######## UNUSED ######## 
 
@@ -195,6 +188,34 @@ class ImageProcessor:
         return contours
 
 
+    def convert_bgr2rgb(self, img_bgr):
+        return cv.cvtColor(img_bgr, cv.COLOR_BGR2RGB)
+
+    def convert_bgr2grayscale(self, img_bgr):
+        return cv.cvtColor(img_bgr, cv.COLOR_BGR2GRAY)
+
+
+    def displayImg(self, window_name, img, save_as):
+        """ @param title    - name given to image in cv window
+            @param img      - image object to display
+            @param save_as  - (string) name to save image as
+            @note press s key during display to save image or any other key to close image """
+
+        # display and wait for key
+        cv.imshow(window_name, img)     
+        key = cv.waitKey(0)      
+               
+        # save image if requested
+        if key==ord("s"):
+            cv.imwrite(save_as, img)    
+        
+        # cv.destroyAllWindows()
+
+    def displayImgProperties(self, img):
+        print("Image Properties:")
+        print("\tRows, columns, channels: ", img.shape)
+        print("\tTotal element count: ", img.size)
+        print("\tThe data type used to represent each pixel is: ", img.dtype)
 
         
     # def draw_contour(self, bin_img, rgb_img, contours):

@@ -3,7 +3,7 @@
 #include "ros/ros.h"
 #include "sensor_msgs/LaserScan.h"
 
-#include "laser_scan/scan_processor.hpp"
+#include "scan_processor.hpp"
 
 using namespace std;
 

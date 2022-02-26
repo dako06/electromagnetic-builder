@@ -15,14 +15,15 @@ from electromagnetic_builder.msg import RPRManipulatorGoal
 from electromagnetic_builder.msg import RPRManipulatorAction
 
 from electromagnetic_builder.msg import VisionAction
-from electromagnetic_builder.msg import VisionActionGoal
+from electromagnetic_builder.msg import VisionResult
+from electromagnetic_builder.msg import VisionGoal
 
 from std_msgs.msg import Empty
 from geometry_msgs.msg import Twist, Pose2D
 from nav_msgs.msg import Odometry
 
 
-from utilities import grid, controller
+from utilities import grid, controller, nav_utilities
 
 
 DEBUG = 1
@@ -194,15 +195,25 @@ class Foreman:
             print("Error: Incorrect Action command given for vision server")
             return 0
             
-        goal = VisionActionGoal(command=command)    # intialize goal data type
+        goal    = VisionGoal(command=command)          # intialize goal data type
+        result  = VisionResult()
 
         self.vision_client.wait_for_server()        # wait for server to prepare for goals    
         self.vision_client.send_goal(goal)          # request goal from server
         self.vision_client.wait_for_result()        # wait for execution
-        result = self.vision_client.get_result()    # get result from server
+
+        # get result from server [is_found, level]
+        result = self.vision_client.get_result() 
+
+        if result.is_found:
+            print('Block candiate succesfully found')
+
+            # set next block coordinates and orientation for adjustment to block
+
+
 
         # return result to state machine
-        return result
+        return result.is_found
 
 
     def requestManipulatorAction(self):
@@ -334,12 +345,19 @@ class Foreman:
         
         return a # a3, a2, a1, a0
 
-    def rotate(self, theta):
+    def rotate(self, goal_coordinate):
 
+        # get desired angle between cells
+        dx      =  goal_coordinate[0] - self.previous_waypoint[0]   
+        dy      =  goal_coordinate[1] - self.previous_waypoint[1]
+        theta   = atan2(dy, dx) 
+
+        # correct theta and set controller to track angle
         self.controller.setPD(5,0) 
-        theta = self.theta_correction(theta)
+        theta = nav_utilities.theta_correction(theta)
         self.controller.setPoint(theta)
-                                         # set desired angle in controller      
+
+        # track until threshold is reached       
         while (self.pose.theta - theta) >= 0.1:
 
             # update controller to track theta and publish velocities 
@@ -351,18 +369,12 @@ class Foreman:
         self.vel_pub.publish(self.vel)
         self.rate.sleep()
 
+    def alignWithBlock(self, T):
+        """ @param T an orientation to align with w.r.t. to some distance offset """ 
+        pass
 
-    """ helper functions """
 
-    def theta_correction(self, theta):
-
-        # adjust theta if discontinuity occurs
-        if theta <= 0 and self.pose.theta >= 0 and self.pose.theta - theta >= pi:
-            theta += 2*pi
-        elif theta > 0 and self.pose.theta < 0 and theta - self.pose.theta > pi:  
-            theta -= 2*pi
-
-        return theta
+    def getBlockOrientation(self): pass
 
 
     """ ROS callback functions """
@@ -379,53 +391,23 @@ class Foreman:
 
 
 # """ temp main function for testing """
-if __name__ == '__main__':
+# if __name__ == '__main__':
     
-    foreman = Foreman()
+    # foreman = Foreman()
 
-    start       = foreman.grid.getCurrent()
-    # goal        = foreman.grid.getGoal("block_storage")
-    goal        = foreman.grid.getGoal("platform")
+    # start       = foreman.grid.getCurrent()
+    # # goal        = foreman.grid.getGoal("block_storage")
+    # goal        = foreman.grid.getGoal("platform")
 
-    print("start: ", start)
-    print("goal: ", goal)
-    # print("obstacles: ", foreman.grid.obstacles)
+    # print("start: ", start)
+    # print("goal: ", goal)
+    # # print("obstacles: ", foreman.grid.obstacles)
 
     
-    waypoints   = foreman.grid.get_path_from_A_star(start, goal, foreman.grid.obstacles)
+    # waypoints   = foreman.grid.get_path_from_A_star(start, goal, foreman.grid.obstacles)
 
-    print("waypoints:", waypoints)
+    # print("waypoints:", waypoints)
 
-    result = foreman.executeTrajectory(waypoints)
+    # result = foreman.executeTrajectory(waypoints)
 
-
-
-################## EOF ################## 
-
-
-
-        
-
-    # camera feed
-    # subscribe to raw cv image feed coming from cv node on tb3
-    # self.camera_sub = rospy.Subscriber("/cv_camera/image_raw", Image, self.image_callback)
-
-    # self.cv_bridge = CvBridge()
-    # self.impro = ImageProcessor()
-    # self.impipeline = ImageBuffer(10)
-
-        #     self.BLOCK_AREA_THRESH = (2700,3100)
-        # self.BLOCK_WIDTH_THRESH = (50,70)
-        # self.BLOCK_HEIGHT_THRESH = (50,70)
-
-        
-    # def imgCallback(self, raw_img):
-
-    #     # convert raw ROS image to CV image 
-    #     try:
-    #         cv_image = self.cv_bridge.imgmsg_to_cv2(raw_img, "bgr8")
-    #     except CvBridgeError as e:
-    #         print(e)
-
-    #     self.impipeline.assignImg(cv_image.copy()) 
 

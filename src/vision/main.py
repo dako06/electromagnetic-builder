@@ -6,7 +6,7 @@ import sys
 import time
 from matplotlib import pyplot as plt
 
-from cv_utilities import ImageProcessor
+from cv_utilities import ImageProcessor 
  
 image_name = "block.png"        # get test image 
 img_bgr = cv.imread(image_name) # load test image as BGR 
@@ -33,7 +33,7 @@ to = time.time()
 
 # filter image based on HSV color masks 
 # mask1 = img_pro.filterColor(img_bgr, img_pro.color_workspace[0], img_pro.color_workspace[1])
-mask2 = img_pro.filterColor(img_bgr, img_pro.color_block[0], img_pro.color_block[1])
+mask2 = img_pro.filterColor(img_bgr, img_pro.block_filter_HSV[0], img_pro.block_filter_HSV[1])
 # mask3 = img_pro.filterColor(img_bgr, img_pro.color_buildsite[0], img_pro.color_buildsite[1])
 mask = mask2
 
@@ -47,7 +47,7 @@ img_erosion = img_pro.applyErosion(kernal_size=4, src=mask, shape="cross")
 # img_pro.displayImg(main_window, img_erosion, 'eroded_raw_mask') 
 
 img_dilation = img_pro.applyDilation(kernal_size=2, src=img_erosion, shape="rectangle")
-img_pro.displayImg(main_window, img_dilation, 'opened_image.png') 
+# img_pro.displayImg(main_window, img_dilation, 'opened_image.png') 
 
 
 # # binary mask & original image 
@@ -55,12 +55,11 @@ img_pro.displayImg(main_window, img_dilation, 'opened_image.png')
 # img_pro.displayImg('Bitwise and of mask and original', result, 'result_img')  # preview loaded image 
 
 
-# # apply erosion with kernal size n = 4 in 2n+1
-# # comp = img_pro.getConnectedComponents(mask, connectivity=8)
-# # img_pro.filterComponents(comp, original_img)
+comp = img_pro.getConnectedComponents(mask, connectivity=8)
+img_pro.filterComponents(comp, img)
 
-# # inline testing of erosion and dilation
-# # dilation_erosion_test.main_dial(img_ero)
+# inline testing of erosion and dilation
+# dilation_erosion_test.main_dial(img_ero)
 
 # # ending time
 tf = time.time()

@@ -19,6 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   image_transport
   message_generation
+  
 )
 
 ## System dependencies are found with CMake's conventions
@@ -116,7 +117,7 @@ generate_messages(
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES electromagnetic_builder
-  CATKIN_DEPENDS actionlib_msgs std_msgs roscpp rospy sensor_msgs  # actionlib 
+  CATKIN_DEPENDS actionlib_msgs std_msgs roscpp rospy sensor_msgs system_lib# actionlib 
   DEPENDS system_lib
 )
 
@@ -138,7 +139,7 @@ include_directories(
 
 
 # scan ROS node
-add_executable(scan_node_cpp src/scan_node.cpp)
+add_executable(scan_node_cpp src/laser_scan/scan_node.cpp)
 target_link_libraries(scan_node_cpp ${catkin_LIBRARIES})
 
 

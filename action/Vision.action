@@ -2,7 +2,8 @@
 string command
 ---
 #result definition
-bool successful
+bool is_found
+int32 level
 float32[] values
 ---
 #feedback

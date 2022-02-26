@@ -133,12 +133,25 @@ class positionForExtraction(smach.State):
         
     def execute(self, userdata):
 
-        foreman.rotate(0)   # point tb3 in general direction of blocks
-        foreman.requestVisionAction('locate_block')
+        foreman.rotate(foreman.grid.block_storage_coordinate)       # rotate robot to general direction of blocks
+        block_found = foreman.requestVisionAction('locate_block')   # find candidate blocks in the field
         
+        # if block is identified then foreman internally has orientation
+        if block_found:
 
-        # return 'ready_for_extraction'
-        return 'extraction_positioning_failure'
+            # get orientation and align with the block
+            T = foreman.getBlockOrientation()
+            pose_ready = foreman.alignWithBlock(T)
+            
+        else:
+            pose_ready = False
+            
+
+        # return transition to state machine
+        if pose_ready:
+            return 'ready_for_extraction'
+        else:
+            return 'extraction_positioning_failure'
 
 
 

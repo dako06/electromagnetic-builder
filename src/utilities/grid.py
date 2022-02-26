@@ -73,8 +73,10 @@ class Grid:
                                     (1, -0.5), (0.5, -0.5), (0,-0.5)] 
         
         # static location of zones of interest
-        self.block_storage_coordinates  = (0, 0.5)  # [m] 
-        self.platform_coordinate        = (0, 1.5)  # [m]
+        self.block_storage_waypoint     = (0, 0.5)      # [m] 
+        self.platform_waypoint          = (0, 1.5)      # [m]
+        self.block_storage_coordinate   = (0.5, 0.5)    # [m] 
+        self.platform_coordinate        = (0.5, 1.5)    # [m]
 
         # actively track current position within grid
         self.current_coordinate = self.start
@@ -186,9 +188,9 @@ class Grid:
     def getGoal(self, goal_name):
 
         if goal_name is 'block_storage':
-            goal = self.block_storage_coordinates
+            goal = self.block_storage_waypoint
         elif goal_name is 'platform':
-            goal = self.platform_coordinate
+            goal = self.platform_waypoint
         else:
             print("Error: Invalid goal request")
             goal = (0,0)

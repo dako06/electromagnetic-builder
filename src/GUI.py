@@ -19,6 +19,7 @@ class GUI:
         self.rate       = rospy.Rate(10)
         
         self.gui_name   = 'Main Window'
+        self.refresh    = 900
         
         cv.namedWindow(self.gui_name, cv.WINDOW_AUTOSIZE)
 
@@ -31,10 +32,8 @@ class GUI:
             print(e)
 
         cv.imshow(self.gui_name, cv_image)
+        cv.waitKey(self.refresh)
         self.rate.sleep()     
-
-
-
 
 if __name__ == '__main__':
 
@@ -44,3 +43,5 @@ if __name__ == '__main__':
         rospy.spin()
     except KeyboardInterrupt:
         print("Shutting Down")
+    finally:
+        cv.destroyAllWindows()
