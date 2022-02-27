@@ -321,10 +321,9 @@ void Prepare_Arm_Motion(Arm_Move_Command cmd) {
   if (cmd.joints_to_move[0]) {
     Prepare_Base_Servo_Move_Task(cmd.base_cmd);
   }
-//  if (cmd.joints_to_move[1]) {
-//    Prepare_LA_Move_Task(cmd.LA_cmd);
-//  }
-
+  if (cmd.joints_to_move[1]) {
+    Prepare_LA_Move_Task(cmd.LA_cmd);
+  }
   if (cmd.joints_to_move[2]) {
     Prepare_End_Servo_Move_Task(cmd.end_cmd);
   }
@@ -350,24 +349,24 @@ void Test_Base() {
   Arm_Move_Queue.enqueue(test_min_angle);
 //  Queue_Return_To_Home();
 }
-//void Test_LA() {
-//  // Test independent movement for the linear actuator
-//  // Command movement at a low speed such that the linear actuator does not accelerate
-//  Arm_Move_Command test_forwards_no_accel = {LA_ONLY,0,{5000,DEFAULT_MODE,LA_MAX_VEL_NO_ACCEL},0};
-//  Arm_Move_Queue.enqueue(test_forwards_no_accel);
-//  Arm_Move_Command test_reverse_no_accel = {LA_ONLY,0,{0,DEFAULT_MODE,LA_MAX_VEL_NO_ACCEL},0};
-//  Arm_Move_Queue.enqueue(test_reverse_no_accel);
-//  // Command movement at 12 mm/s, which is above the max speed that the linear actuator can achieve from 
-//    // rest without taking time to accelerate
-//  Arm_Move_Command test_forwards_with_accel = {LA_ONLY,0,{5000,DEFAULT_MODE,12},0};
-//  Arm_Move_Queue.enqueue(test_forwards_with_accel);
-//  Arm_Move_Command test_reverse_with_accel = {LA_ONLY,0,{0,DEFAULT_MODE,12},0};
-//  Arm_Move_Queue.enqueue(test_reverse_with_accel);
-//  // Test homing the linear actuator
-//  Arm_Move_Command move_forwards = {LA_ONLY,0,{2000,DEFAULT_MODE,LA_MAX_VEL_NO_ACCEL},0};
-//  Arm_Move_Queue.enqueue(move_forwards);
-//  Queue_LA_Homing();
-//}
+void Test_LA() {
+ // Test independent movement for the linear actuator
+ // Command movement at a low speed such that the linear actuator does not accelerate
+ Arm_Move_Command test_forwards_no_accel = {LA_ONLY,0,{5000,DEFAULT_MODE,LA_MAX_VEL_NO_ACCEL},0};
+ Arm_Move_Queue.enqueue(test_forwards_no_accel);
+ Arm_Move_Command test_reverse_no_accel = {LA_ONLY,0,{0,DEFAULT_MODE,LA_MAX_VEL_NO_ACCEL},0};
+ Arm_Move_Queue.enqueue(test_reverse_no_accel);
+ // Command movement at 12 mm/s, which is above the max speed that the linear actuator can achieve from 
+   // rest without taking time to accelerate
+ Arm_Move_Command test_forwards_with_accel = {LA_ONLY,0,{5000,DEFAULT_MODE,12},0};
+ Arm_Move_Queue.enqueue(test_forwards_with_accel);
+ Arm_Move_Command test_reverse_with_accel = {LA_ONLY,0,{0,DEFAULT_MODE,12},0};
+ Arm_Move_Queue.enqueue(test_reverse_with_accel);
+ // Test homing the linear actuator
+ Arm_Move_Command move_forwards = {LA_ONLY,0,{2000,DEFAULT_MODE,LA_MAX_VEL_NO_ACCEL},0};
+ Arm_Move_Queue.enqueue(move_forwards);
+ Queue_LA_Homing();
+}
 void Test_End() {
   // Test range of motion for base servo
   Arm_Move_Command test_max_angle = {END_ONLY,0,LA_NO_MOVE_CMD,END_MAX_PULSE_WIDTH};
