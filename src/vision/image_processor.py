@@ -5,7 +5,6 @@ import numpy as np
 
 class ImageProcessor:
 
-
     def __init__(self) -> None:
 
         # HSV color lower and upper thresholds  
@@ -14,7 +13,7 @@ class ImageProcessor:
         self.color_buildsite = np.array(([165, 90, 20], [170, 200, 255]), dtype = "uint8")  
 
         # threshold used for filtering single block during pixel component analysis (element 0 is min and element 1 is max)
-        self.block_pixel_thresh = {'width':(50,70), 'height':(50,70), 'area':(2700,3100)}
+        self.block_pixel_thresh = {'width':(50,70), 'height':(50,70), 'area':(2400,3100)}
 
 
     def compoundOpenImage(self, src):
@@ -38,7 +37,8 @@ class ImageProcessor:
             connectivity = 8
 
         (numLabels, labels, stats, centroids) = cv.connectedComponentsWithStats(img_binary, connectivity, cv.CV_32S)
-        
+        # print("number of components: ", numLabels)
+
         return (numLabels, labels, stats, centroids)
         
   
@@ -59,53 +59,32 @@ class ImageProcessor:
         # unpack connected component tuple 
         (label_count, label_matrix, stats, centroids) = comp_tuple
 
+        comp_list = []
+
         # iterate over number of components (hard coded to ignore background)
         for i in range(1, label_count):
 
             w = stats[i, cv.CC_STAT_WIDTH]
             h = stats[i, cv.CC_STAT_HEIGHT]
             area = stats[i, cv.CC_STAT_AREA]
+            # print("width, height, area: %f, %f, %f" % (w,h,area)) # debug
 
-            if (w < min_width or w > max_width):
-                continue
-            if (h < min_height or h > max_height): 
-                continue                 
-            if (area < min_area or area > max_area): 
-                continue 
+            # check that component satisfies thresholds
+            if (w > min_width and w < max_width) and (h > min_height and h < max_height) and (area > min_area and area < max_area): 
 
-            x = stats[i, cv.CC_STAT_LEFT]
-            y = stats[i, cv.CC_STAT_TOP]
+                comp_dim = {'xy': (stats[i, cv.CC_STAT_LEFT], stats[i, cv.CC_STAT_TOP]), \
+                            'wh':(w,h), 'centroid':(centroids[i]), 'area':area, 'label_id':i}
 
-            # store this components x and y in stats matrix
-            xy_tup = (stats[i, cv.CC_STAT_LEFT], stats[i, cv.CC_STAT_TOP])
+                comp_list.append(comp_dim)
 
-            wh_tup = (w, h)                 # store width and height
+                # print("x, y : ", comp_dim.get('xy'))                
+                # print("w, h : ", comp_dim.get('wh')) 
+                # print("centroid : ", comp_dim.get('centroid')) 
 
-            (c_x, c_y) = (centroids[i]) # store this components centroid
-
-            component_mask = (label_matrix == i).astype("uint8") * 255
-
-            # cv.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 3)
-            # cv.circle(img, (int(cX), int(cY)), 4, (0, 0, 255), -1)
-                
-            print("x, y :", xy_tup)                
-            print("w, h :", wh_tup) 
-            print("centroid : %f, %f" % (c_x, c_y)) 
-            print("component_mask :", component_mask) 
-                
-
-            return [xy_tup, wh_tup, (c_x, c_y)], component_mask  
+        return comp_list, label_matrix  
 
 
-    def filterColor(self, img_bgr, lower, upper):
-        """
-        Find indices of image within range of lower and upper bound in HSV color range.
-        @param img_bgr - BGR image 
-        @param lower - lower bound of HSV range
-        @param upper - upper bound of HSV range
-        @return: binary mask describing inbound indices """
 
-        return cv.inRange(cv.cvtColor(img_bgr, cv.COLOR_BGR2HSV), lower, upper)
     
     def applyErosion(self, kernal_size, src, shape):
  
@@ -148,6 +127,45 @@ class ImageProcessor:
         bounding_rect = cv.rectangle(src, (x, y), (x + w, y + h), (0, 255, 0), 3)
 
 
+    def filterColor(self, img_bgr, lower, upper):
+        """
+        Find indices of image within range of lower and upper bound in HSV color range.
+        @param img_bgr - BGR image 
+        @param lower - lower bound of HSV range
+        @param upper - upper bound of HSV range
+        @return: binary mask describing inbound indices """
+
+        return cv.inRange(cv.cvtColor(img_bgr, cv.COLOR_BGR2HSV), lower, upper)
+
+
+    def displayImg(self, window_name, img, save_as):
+        """ @param title    - name given to image in cv window
+            @param img      - image object to display
+            @param save_as  - (string) name to save image as
+            @note press s key during display to save image or any other key to close image """
+
+        # display and wait for key
+        cv.imshow(window_name, img)     
+        key = cv.waitKey(0)      
+               
+        # save image if requested
+        if key==ord("s"):
+            cv.imwrite(save_as, img)    
+        
+        # cv.destroyAllWindows()
+
+    def displayImgProperties(self, img):
+        print("Image Properties:")
+        print("\tRows, columns, channels: ", img.shape)
+        print("\tTotal element count: ", img.size)
+        print("\tThe data type used to represent each pixel is: ", img.dtype)
+
+    def convert_bgr2rgb(self, img_bgr):
+        return cv.cvtColor(img_bgr, cv.COLOR_BGR2RGB)
+
+    def convert_bgr2grayscale(self, img_bgr):
+        return cv.cvtColor(img_bgr, cv.COLOR_BGR2GRAY)
+
 
     ######## UNUSED ######## 
 
@@ -188,34 +206,7 @@ class ImageProcessor:
         return contours
 
 
-    def convert_bgr2rgb(self, img_bgr):
-        return cv.cvtColor(img_bgr, cv.COLOR_BGR2RGB)
 
-    def convert_bgr2grayscale(self, img_bgr):
-        return cv.cvtColor(img_bgr, cv.COLOR_BGR2GRAY)
-
-
-    def displayImg(self, window_name, img, save_as):
-        """ @param title    - name given to image in cv window
-            @param img      - image object to display
-            @param save_as  - (string) name to save image as
-            @note press s key during display to save image or any other key to close image """
-
-        # display and wait for key
-        cv.imshow(window_name, img)     
-        key = cv.waitKey(0)      
-               
-        # save image if requested
-        if key==ord("s"):
-            cv.imwrite(save_as, img)    
-        
-        # cv.destroyAllWindows()
-
-    def displayImgProperties(self, img):
-        print("Image Properties:")
-        print("\tRows, columns, channels: ", img.shape)
-        print("\tTotal element count: ", img.size)
-        print("\tThe data type used to represent each pixel is: ", img.dtype)
 
         
     # def draw_contour(self, bin_img, rgb_img, contours):

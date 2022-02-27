@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from click import command
 import rospy
 import tf
 
@@ -18,10 +17,8 @@ import numpy as np
 from math import pi
 from cv_bridge import CvBridge, CvBridgeError
 
-from utilities import decision_switch, image_buffer, controller
-
-from utilities import cv_utilities, nav_utilities
-
+from utilities import decision_switch, controller, nav_utilities
+from vision import image_buffer, image_processor
 
 class VisionActionServer(object):
     
@@ -49,7 +46,7 @@ class VisionActionServer(object):
 
         # support objects for image processing
         self.controller = controller.Controller()
-        self.img_pro    = cv_utilities.ImageProcessor()
+        self.img_pro    = image_processor.ImageProcessor()
         self.img_buffer = image_buffer.ImageBuffer(5)
 
 
@@ -89,26 +86,21 @@ class VisionActionServer(object):
 
         while len(pixel_coordinates) == 0 and theta_sum < 2*pi:
             
-            (is_img, img) = self.img_buffer.getImg()
+            is_img, img = self.img_buffer.getImg()
 
-            # skip iteration if image is not available
+            # skip if image is not available
             if not is_img:
                 continue
             
-            self.img_pro.displayImg("temp", img, "temp.png")
+            # self.img_pro.displayImg("temp", img, "temp.png")
+
             
-            # apply color filter to mask
-            mask        = self.img_pro.filterColor(img, filter[0], filter[1])
+            mask                    = self.img_pro.filterColor(img, filter[0], filter[1])                   # apply color filter to mask
+            opened_mask             = self.img_pro.compoundOpenImage(mask)                                  # open image to remove outliers
+            comp                    = self.img_pro.getConnectedComponents(opened_mask, connectivity=8)      # get connected components
+            comp_list, label_matrix = self.img_pro.filterComponents(comp, self.img_pro.block_pixel_thresh)  # filter outlier components
+
             
-            # apply compound operation of opening image to remove outliers
-            opened_mask = self.img_pro.compoundOpenImage(mask)
-
-            # get connected components
-            comp = self.img_pro.getConnectedComponents(opened_mask, connectivity=8)
-
-
-
-
 
             # update theta for angle loop condition 
             theta_i     = self.pose.theta
@@ -130,7 +122,12 @@ class VisionActionServer(object):
         except CvBridgeError as e:
             print(e)
 
-        self.img_buffer.assignImg(cv_image.copy()) 
+        cv_image_copy = cv_image.copy()
+        
+        if cv_image_copy is None:
+            return
+        else:
+            self.img_buffer.assignImg(img.copy()) 
 
     def odom_callback(self, msg):
         # get pose = (x, y, theta) from odometry topic

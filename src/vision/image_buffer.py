@@ -10,8 +10,9 @@ class ImageBuffer:
         @param max_size - maximum size of data structure
         """
         
-        self.MAX_SIZE = max_size
-        self.img_queue = deque()
+        self.MAX_SIZE   = max_size
+        self.img_queue  = deque()
+        self.size       = len(self.img_queue) 
 
     def assignImg(self, img):
         # if queue is full then make space for update
@@ -19,6 +20,9 @@ class ImageBuffer:
             self.img_queue.popleft()    
         self.img_queue.append(img)
         
+    def getItemCount(self):
+        self.size = len(self.img_queue)
+        return self.size
 
     def getImg(self):
         
