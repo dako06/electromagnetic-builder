@@ -118,7 +118,7 @@ class Foreman:
             # save trajectory into csv file
             # np.savetxt('trajectory.csv', np.array(self.trajectory), fmt='%f', delimiter=',')
 
-        self.cv_commands = ['locate_block']
+        self.cv_commands = ['locate_block_candidate']
         # rospy.spin()
 
     """ blueprint functions """
@@ -191,23 +191,26 @@ class Foreman:
 
     def requestVisionAction(self, command):
 
+        # confirm valid command is requested
         if command not in self.cv_commands:
             print("Error: Incorrect Action command given for vision server")
-            return 0
+            return False
             
-        goal    = VisionGoal(command=command)          # intialize goal data type
+        vis_goal    = VisionGoal(command=command)          # intialize goal data type
         result  = VisionResult()
-
+        
         self.vision_client.wait_for_server()        # wait for server to prepare for goals    
-        self.vision_client.send_goal(goal)          # request goal from server
+        self.vision_client.send_goal(vis_goal)      # request goal from server
         self.vision_client.wait_for_result()        # wait for execution
 
         # get result from server [is_found, level]
         result = self.vision_client.get_result() 
 
         if result.is_found:
-            print('Block candiate succesfully found')
 
+            print('Block candiate succesfully found')
+            print('Objects centroid: %f %f' % (result.centroid_x, result.centroid_y))
+            print('pixel area: ', result.pixel_area)
             # set next block coordinates and orientation for adjustment to block
 
 

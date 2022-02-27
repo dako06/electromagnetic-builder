@@ -82,7 +82,6 @@ class PixelGrid:
         if len(compenent_list) == 0:
             return "empty", [], False
 
-        # print("here")
         # sort components based nearest pixel space distance 
         compenent_list.sort(key = lambda x: self.pixelDistanceHeuristic(x.get('centroid')))
         # compenent_list.sort(key = lambda x: print(x.get('centroid')))
@@ -93,20 +92,17 @@ class PixelGrid:
 
         if (cx > self.center_column_window[0]) and (cx < self.center_column_window[1]):
             
-            is_centered    = True
-            rot_dir         = "none"
+            grid_position   = "center"
         
         else:
-
-            is_centered = False
             
             # determine rotation direction required to center object with robots perspective 
             if (cx - self.base_pixel[1]) > 0:
-                rot_dir = "right"
+                grid_position = "right"
             else:
-                rot_dir = "left"
+                grid_position = "left"
 
-        return rot_dir, nearest_comp, is_centered
+        return grid_position, nearest_comp
      
         
 

@@ -9,16 +9,16 @@ from geometry_msgs.msg import Twist, Pose2D
 from actionlib import SimpleActionServer 
 from sensor_msgs.msg import Image
 
-from electromagnetic_builder.msg import VisionActionFeedback
+from electromagnetic_builder.msg import VisionFeedback
 from electromagnetic_builder.msg import VisionAction
-from electromagnetic_builder.msg import VisionActionResult
+from electromagnetic_builder.msg import VisionResult
 
 import numpy as np
 from math import pi
 from cv_bridge import CvBridge, CvBridgeError
 
 from utilities import decision_switch, controller, nav_utilities
-from vision import image_buffer, image_processor
+from vision import image_buffer, image_processor, pixel_grid
 
 class VisionActionServer(object):
     
@@ -48,23 +48,39 @@ class VisionActionServer(object):
         self.controller = controller.Controller()
         self.img_pro    = image_processor.ImageProcessor()
         self.img_buffer = image_buffer.ImageBuffer(5)
-
+        self.pix_grid   = pixel_grid.PixelGrid((480,640), 4)
 
         self.cmd_dict   = ["locate_block"]
-        self.dswitch         = decision_switch.DecisionBlock(self.cmd_dict)
+        self.dswitch    = decision_switch.DecisionBlock(self.cmd_dict)
 
     def execute_callback(self, goal):
         
         # intialize action messages 
-        result      = VisionActionResult()
-        feedback    = VisionActionFeedback()
+        result      = VisionResult()
+        feedback    = VisionFeedback()
 
         rospy.loginfo('%s: Executing command %s' % (self.action_name, goal.command))
         
         if goal.command == "locate_block":
-            rospy.loginfo('%s: Scanning field for object' % self.action_name)
-            scan_outcome = self.fieldScan(self.impro.block_filter_HSV)
 
+            rospy.loginfo('%s: Scanning field for object' % self.action_name)
+
+            execution_status, obj_comp_stats = self.fieldScan(self.impro.block_filter_HSV)
+            result.is_found = execution_status
+            result.values 
+
+            # TODO check if its stacked and return level 
+
+
+
+        # return server outcome
+        if result.is_found:
+            rospy.loginfo('%s: Succeeded' % self.action_name)
+            self.action_server.set_succeeded(result)
+        
+        else:
+            rospy.loginfo('%s: Failed' % self.action_name)
+            self.action_server.set_aborted(result)
 
         # check for preempt request from client 
         # if self.action_server.is_preempt_requested():
@@ -73,18 +89,15 @@ class VisionActionServer(object):
         # # feedback.percent_complete = 
         # self.action_server.publish_feedback(feedback) 
 
-        rospy.loginfo('%s: Succeeded' % self.action_name)
-        self.action_server.set_succeeded(result)
-
 
     def fieldScan(self, filter):
         """ @param filter: use filter to rotate and scan field for object """
 
         theta_sum, theta_prev, theta_i = 0, 0, 0
         
-        pixel_coordinates   = []
+        obj_position = "unknown"
 
-        while len(pixel_coordinates) == 0 and theta_sum < 2*pi:
+        while obj_position != "center" and theta_sum < 2*pi:
             
             is_img, img = self.img_buffer.getImg()
 
@@ -94,13 +107,20 @@ class VisionActionServer(object):
             
             # self.img_pro.displayImg("temp", img, "temp.png")
 
-            
             mask                    = self.img_pro.filterColor(img, filter[0], filter[1])                   # apply color filter to mask
             opened_mask             = self.img_pro.compoundOpenImage(mask)                                  # open image to remove outliers
             comp                    = self.img_pro.getConnectedComponents(opened_mask, connectivity=8)      # get connected components
             comp_list, label_matrix = self.img_pro.filterComponents(comp, self.img_pro.block_pixel_thresh)  # filter outlier components
 
-            
+            obj_position, nearest_comp  = self.pix_grid.findNearestObject(comp_list) 
+
+            # set angular scan velocity direction
+            if obj_position == "right": 
+                self.vel.angular.z = -1*self.scan_vel_ref
+            elif obj_position == "left":
+                self.vel.angular.z = self.scan_vel_ref
+            elif obj_position == "center":
+                self.vel.angular.z = 0
 
             # update theta for angle loop condition 
             theta_i     = self.pose.theta
@@ -108,9 +128,15 @@ class VisionActionServer(object):
             theta_prev  = theta_i
 
             # publish angular velocity
-            self.vel.angular.z = self.scan_vel_ref
             self.vel_pub.publish(self.vel)
             self.rate.sleep()
+        
+        # return success indicator and component
+        if len(nearest_comp) == 0 or obj_position != "center":
+            return False, []
+        else:
+            return True, nearest_comp
+        
                                 
 
     """ callback functions """

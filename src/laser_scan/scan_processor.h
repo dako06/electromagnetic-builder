@@ -17,6 +17,10 @@ class ScanProcessor
 
     private:
 
+        // angular limits to limit forward perspective 
+        std::vector <int>angular_constraints = {0, 30, 330, 359}; 
+
+
 
 
 };

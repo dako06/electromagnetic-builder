@@ -4,7 +4,11 @@ string command
 #result definition
 bool is_found
 int32 level
-float32[] values
+float32 centroid_x
+float32 centroid_y
+float32 pixel_area
+int32 row
+int32 col
 ---
 #feedback
 float32 percent_complete

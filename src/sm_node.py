@@ -133,8 +133,17 @@ class positionForExtraction(smach.State):
         
     def execute(self, userdata):
 
-        foreman.rotate(foreman.grid.block_storage_coordinate)       # rotate robot to general direction of blocks
-        block_found = foreman.requestVisionAction('locate_block')   # find candidate blocks in the field
+
+        """ 1. rotate until the block filter finds candidates
+            2. identify nearest block and center it 
+            3. determine its distance and confirm its within range 
+            4. determine its level
+            5. send estimated extraction coordinates (x,y,z) to rpr
+            """
+
+        # foreman.rotate(foreman.grid.block_storage_coordinate)       # rotate robot to general direction of blocks
+
+        block_found = foreman.requestVisionAction('locate_block_candidate')   # find candidate blocks in the field
         
         # if block is identified then foreman internally has orientation
         if block_found:
@@ -145,6 +154,8 @@ class positionForExtraction(smach.State):
             
         else:
             pose_ready = False
+
+
             
 
         # return transition to state machine
@@ -162,7 +173,14 @@ class extractBlock(smach.State):
         smach.State.__init__(self, outcomes=['block_secured', 'extraction_failure'],
                                     output_keys=['extraction_nav_request'])
         
+        """ 1. if valid coordinates are given publish rpr goal
+            2. track end-effector and confirm connection with block
+            3. publish commands to em
+            4. publish return to home command to rpr
+            5. track end-effector while confirming connection with block """
+    
     def execute(self, userdata):
+
 
 
         userdata.extraction_nav_request = "platform"
@@ -175,6 +193,9 @@ class positionForPlacement(smach.State):
     def __init__(self):
         # state class initialization
         smach.State.__init__(self, outcomes=['ready_for_placement', 'placement_positioning_failure'])
+
+        """ 1. rotate until aligned with platform 
+            2. estimate placement coordinate based on blueprint """
         
     def execute(self, userdata):
         # Your state execution goes here
@@ -191,11 +212,16 @@ class placeBlock(smach.State):
         # intialize state class and its outcomes   
         smach.State.__init__(self, outcomes=['block_placement_success', 'block_placement_failure'])
         
+        """ 1. send goal to rpr
+            2. track rpr and conneciton to block
+            3. publish low signal to em
+            4. publish return to home to rpr """
+
+
     def execute(self, userdata):
         pass
         # return 'block_secured'
         # return 'extraction_failure'
-
 
         
 def main():
@@ -220,7 +246,7 @@ def main():
                                     'startup_failure':'system_failure'})
 
         smach.StateMachine.add('EVALUATE_BUILD_STATUS', evaluateBuildStatus(),
-                               transitions={'build_incomplete':'NAVIGATE_TO_ZONE',
+                               transitions={'build_incomplete':'POSITION_FOR_EXTRACTION',
                                             'build_complete':'construction_complete'},
                                 remapping={'eval_nav_request':'nav_request'})
         
@@ -235,7 +261,7 @@ def main():
                                             'extraction_positioning_failure':'system_failure'})
 
         smach.StateMachine.add('EXTRACT_BLOCK', extractBlock(),
-                               transitions={'block_secured':'NAVIGATE_TO_ZONE', 
+                               transitions={'block_secured':'POSITION_FOR_PLACEMENT', 
                                             'extraction_failure':'system_failure'},
                                 remapping={'extraction_nav_request':'nav_request'})
 

@@ -8,7 +8,7 @@ from image_processor import ImageProcessor
 from image_buffer import ImageBuffer 
 from pixel_grid import PixelGrid
 
-TEST = 2
+TEST = 0
 
 """ setup window """
 main_window = 'Main Window'
@@ -44,7 +44,10 @@ if TEST == 0:
 
     image_name  = "test_3.png"         
     img_bgr     = cv.imread(image_name)  
-    img         = img_bgr.copy()             
+    img         = img_bgr.copy()   
+
+    img_pro.displayImgProperties(img_bgr)                                   
+          
 
     if img_bgr is None:
         sys.exit("Could not read the image.") # exit if issue opening image
@@ -65,6 +68,10 @@ if TEST == 0:
         (w,h)       = d.get('wh')
         (cX, cY)    = d.get('centroid')
         ix          = d.get('label_id')
+        print("x,y: %f, %f" % (x,y))
+        print("cX,cY: %f, %f" % (cX,cY))
+        print("w,h: %f, %f" % (w,h))
+
         component_mask = (label_matrix == ix).astype("uint8") * 255
         cv.circle(img, (int(cX), int(cY)), 4, (0, 0, 255), -1)
         cv.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 3)
@@ -104,7 +111,7 @@ if TEST == 1:
 
 if TEST == 2:
 
-    """ pixel tracker """
+    """ find nearest object """
     image_name  = "test_3.png"         
     img_bgr     = cv.imread(image_name)  
     img         = img_bgr.copy()  
@@ -119,14 +126,13 @@ if TEST == 2:
     comp_list, label_matrix     = img_pro.filterComponents(comp, img_pro.block_pixel_thresh)
     # print("number of remaining components: ", len(comp_list))
 
-
     # find nearest object to turtlebot
-    obj_dir, nearest_comp, is_centered  = pix_grid.findNearestObject(comp_list) 
+    obj_position, nearest_comp = pix_grid.findNearestObject(comp_list) 
 
-    print("direction: ", obj_dir)
-    print("nearest component", nearest_comp)
-    print("is it centered?", is_centered)
-    tf                          = time.time()
+    tf = time.time()
+    
+    print("position of object in pixel space: ", obj_position)
+    print("nearest component: ", nearest_comp)
 
 
 
