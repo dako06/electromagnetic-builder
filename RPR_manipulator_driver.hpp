@@ -90,8 +90,8 @@ void Init_Linear_Actuator() {
 }
 
 void Start_LA_Homing() {
- if (base_is_moving || LA_is_moving || end_is_moving) {
-   Serial.println("Could not execute homing, another motion task is currently in progress");
+ if (base_is_moving) {
+   //Serial.println("Could not execute homing, another motion task is currently in progress");
  }
  LA_is_homing = true;
  LA_is_moving = true;
@@ -155,7 +155,7 @@ void Lin_Act_Move_Callback() {
 void Prepare_LA_Move_Task(LA_Move_Command LA_cmd) {
   unsigned int goal_position = LA_cmd.goal_position;
   if (!LA_Is_Valid_Position(goal_position)) {
-    Serial.println("goal_position was invalid in call to Prepare_LA_Move_Task");
+    //Serial.println("goal_position was invalid in call to Prepare_LA_Move_Task");
     return;
   }
   LA_is_moving = true;
@@ -215,7 +215,7 @@ void LA_Update_Pulse_Width() {
   if (vel_update_counter % 100 == 0) {
     float vel_to_match = BASE_DEFAULT_VEL * (L0 + LA_Pos_mm()) * base_angle_tan;
     unsigned int pulse_width_to_match = LA_Vel_To_Pulse_Width(vel_to_match);
-    LA_Send_Goal_Position(pulse_width_to_match);
+    //LA_Send_Pulse_Width(max(pulse_width_to_match, LA_Get_Max_Achievable_Pulse_Width());
   }
 }
 
@@ -230,6 +230,30 @@ bool LA_Is_Valid_Position(unsigned int pos) {
 unsigned int LA_Vel_To_Pulse_Width(float vel_in_mm_per_sec) {
  return (1.0/vel_in_mm_per_sec)*5000 + 0.5;
 }
+
+// Using conservative estimates
+// unsigned int LA_Get_Max_Achievable_Pulse_Width() {
+//     // If base angle is within 20 degrees of 0, use 300
+//     // If base angle is within 40 degrees of 0, use 400
+//     // If base angle greater than those, use 625
+//   if (abs(base_curr_position - BASE_ZERO_POSITION_PULSE_WIDTH) <= 200) {
+//     return 300;
+//   }
+//   else if (abs(base_curr_position - BASE_ZERO_POSITION_PULSE_WIDTH) <= 400) {
+//     return 400;
+//   }
+//   else {
+//     return 625;
+//   }
+// }
+
+// void LA_Send_Pulse_Width(unsigned int pulse_width) {
+//   LA_CNTRL_SERIAL.write(SET_GOAL_VELOCITY_MSG);
+//   byte goal_vel_lower_7 = pulse_width & 0x7F;
+//   byte goal_vel_upper_7 = (pulse_width & 0x3F80) >> 7;
+//   LA_CNTRL_SERIAL.write(goal_vel_lower_7);
+//   LA_CNTRL_SERIAL.write(goal_vel_upper_7);
+// }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///*********************************** End servo functions ****************************************************/
@@ -270,7 +294,7 @@ void Prepare_End_Servo_Move_Task(int goal_position) {
  
  // check for 800 < goal < 2300
  if (goal_position > END_MAX_PULSE_WIDTH || goal_position < END_MIN_PULSE_WIDTH) {
-   Serial.println("goal_position was invalid in call to Prepare_End_Servo_Move_Task");
+   //Serial.println("goal_position was invalid in call to Prepare_End_Servo_Move_Task");
  }
  end_goal_position = goal_position;
  end_move_dir = (end_curr_position > end_goal_position) ? -1 : 1; // -1 for CW, 1 for CCW
