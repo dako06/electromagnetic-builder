@@ -95,19 +95,21 @@ void Start_LA_Homing() {
  }
  LA_is_homing = true;
  LA_is_moving = true;
+ LA_goal_position = 0;
  LA_CNTRL_SERIAL.write(SET_MODE_HOMING_MSG);
 }
 
 void Lin_Act_Move_Callback() {
   if (LA_CNTRL_SERIAL.available()) {
-    //Serial.write(LA_CNTRL_SERIAL.read());
     // Move complete or homing complete signal was received
     if (LA_is_homing) {
       LA_curr_position = 0; 
       LA_is_homing = false;
     }
+    else {
+      LA_curr_position = LA_goal_position;
+    }
     LA_is_moving = false;
-    LA_CNTRL_SERIAL.flush();
   }
   /*
   // If homing is in progress, just wait for the HOMING_COMPLETE message
@@ -242,29 +244,26 @@ void Init_End_Servo() {
   end_is_moving = false;
 }
 void End_Servo_Move_Callback() {
+  
   // The end servo position needs to be updated as the end servo arrives at the position that was calculated 
     // in the previous iteration. When this function is first called, the end servo will be arriving at the position which
     // was assigned to new_position at the end of the previous iteration, and the current position is updated to reflect this
-  static int new_position = 0;
-  if (new_position != 0) {
-    end_curr_position = new_position;
-  }
-  new_position = end_curr_position + (end_move_dir * END_WIDTH_INCREMENT);
-  if (new_position >= END_MIN_PULSE_WIDTH && new_position <= END_MAX_PULSE_WIDTH) {
-    // Do not start a for loop if we are already within 1 iteration of the target position
-    if (abs(new_position - end_goal_position) <= END_WIDTH_INCREMENT) {
-      End_joint.write(new_position);
-      // Goal position reached
-      end_is_moving = false;
-    }
-    else {
-      End_joint.write(new_position);
-    }
+  static int new_position = END_ZERO_POSITION_PULSE_WIDTH;
+  end_curr_position = new_position;
+  if (abs(end_curr_position - end_goal_position) <= END_WIDTH_INCREMENT) {
+    End_joint.write(end_goal_position);
+    end_curr_position  = end_goal_position;
+    // Goal position reached
+    end_is_moving = false;
   }
   else {
-    Serial.print("new_position was invalid in End_Servo_Move_Callback: ");
-    Serial.println(new_position);
-    end_is_moving = false;
+    new_position = end_curr_position + (end_move_dir * END_WIDTH_INCREMENT);
+    if (new_position >= END_MIN_PULSE_WIDTH && new_position <= END_MAX_PULSE_WIDTH) {
+      End_joint.write(new_position);
+    }
+    else {
+      end_is_moving = false;
+    }
   }
 }
 void Prepare_End_Servo_Move_Task(int goal_position) {
@@ -333,7 +332,7 @@ void Queue_Pick_Up_Block(float block_x, float block_z) {
  unsigned int LA_start_pos = theta2 * 100;
  int end_start_pos = End_Rad_to_PWM(theta3);
  Arm_Move_Command Move_1 = {ALL_JOINTS, base_start_pos, {LA_start_pos, DEFAULT_MODE, 8}, end_start_pos};
-//  Arm_Move_Queue.enqueue(Move_1);
+ Arm_Move_Queue.enqueue(Move_1);
  // Second move: perform downward vertical motion to make contact with the block
  theta1 = atan2(block_z,block_x);
  theta2 = block_x/cos(theta1) - L0;

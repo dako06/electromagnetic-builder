@@ -37,8 +37,6 @@
 #define LA_MAX_VEL_NO_ACCEL 8 // The maximum velocity that the linear actuator can begin moving to from rest, in mm/s
 #define LA_DEFAULT_ACCEL_RATE 1
 #define LA_DEFAULT_VEL 10
-#define L0 215 // The distance in the x direction from the base joint to the end joint with
-                // the linear actuator fully retracted
 unsigned int LA_curr_position;
 unsigned int LA_goal_position;
 bool block_place_mode;

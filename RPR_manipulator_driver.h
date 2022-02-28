@@ -6,6 +6,10 @@
 //#include <Arduino.h>
 #include <Servo.h>
 
+#define L0 210 // The distance in the x direction from the base joint to the end joint with the linear actuator fully retracted
+#define h1 106 // The distancein the z direction between the top plate of the turtlebot and the axis of rotation of the base joint
+#define h2 42 // The distance in the z direction between the end effector (bottom of the electromagnet) and the axis of rotation of the end joint
+
 #include "RPR_base_servo.h"
 #include "RPR_linear_actuator.h"
 #include "RPR_end_servo.h"
@@ -38,7 +42,7 @@ struct Arm_Move_Command {
   int end_cmd;
 };
 // Queue for storing motion tasks
-#define QUEUE_MAX_SIZE 10
+#define QUEUE_MAX_SIZE 50
 ArduinoQueue<Arm_Move_Command> Arm_Move_Queue(QUEUE_MAX_SIZE);
 
 /****** High-level arm motion functions ******/
