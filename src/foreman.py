@@ -18,12 +18,15 @@ from electromagnetic_builder.msg import VisionAction
 from electromagnetic_builder.msg import VisionResult
 from electromagnetic_builder.msg import VisionGoal
 
-from std_msgs.msg import Empty
+from electromagnetic_builder.msg import gui_state
+
+
+from std_msgs.msg import Empty, Float32
 from geometry_msgs.msg import Twist, Pose2D
 from nav_msgs.msg import Odometry
 
 
-from utilities import grid, controller, nav_utilities
+from utilities import grid, controller
 
 
 DEBUG = 1
@@ -38,9 +41,14 @@ class Foreman:
         rospy.init_node('foreman_node', anonymous=True)
         rospy.loginfo("Starting message: Press Ctrl + C to terminate")
 
-        # intialize rpr maniupulator client
-        # self.rpr_client = SimpleActionClient('rpr_manip_action', RPRManipulatorAction)
+        self.gui_state      = gui_state()
+        self.gui_update_pub = rospy.Publisher("gui_state", gui_state, queue_size=10)
 
+
+        # intialize rpr maniupulator client
+        self.rpr_client = SimpleActionClient('rpr_manip_action', RPRManipulatorAction)
+
+        # intialize cv processing client
         self.vision_client = SimpleActionClient('vision_action', VisionAction)
 
         # navigation 
@@ -51,6 +59,10 @@ class Foreman:
         # odometry
         self.pose               = Pose2D()
         self.odom_sub           = rospy.Subscriber("odom", Odometry, self.odom_callback)
+
+        # processed scan
+        self.processed_scan_sub = rospy.Subscriber("scan_distance", Float32, self.scan_callback)
+        self.forward_distance   = 0
 
         # reset odometry to zero
         # self.reset_pub = rospy.Publisher("mobile_base/commands/reset_odometry", Empty, queue_size=10)
@@ -72,11 +84,15 @@ class Foreman:
         self.INCH2METER         = 0.0254                # inches to meters 
         self.BLOCK_LENGTH   = 1.5 * self.INCH2METER
         self.BLOCK_WIDTH    = 1.5 * self.INCH2METER
-        self.BLOCK_HEIGHT   = 1.5 * self.INCH2METER
 
+
+        self.BLOCK_HEIGHT   = 1.5 * self.INCH2METER
+        self.rpr_z_offset   = 141                       # distance of rpr z origin above ground [mm]
+        self.rpr_x_offset   = 60                        # distance from rpr base servo axis of rotation to LDS
         
         # navigation 
-        self.vel_ref            = 0.17   # reference velocity
+        self.vel_ref            = 0.17  # reference velocity
+        self.angular_vel_ref    = 0.1   # reference velocity
         self.time_extension     = 10    # splits T into discrete time elements 
         self.T                  = 2 
 
@@ -219,14 +235,16 @@ class Foreman:
         return result.is_found
 
 
-    def requestManipulatorAction(self):
+    def requestBlockExtraction(self):
 
         # wait for server to prepare for goals
         self.rpr_client.wait_for_server()    
 
-        # intialize goal data type
-        manip_goal = RPRManipulatorGoal()
-
+        # preprocess goal for rpr constraints (adjust for axis offset and convert to mm)
+        manip_goal = RPRManipulatorGoal()        
+        manip_goal.x = self.forward_distance * 1000.0 - self.rpr_x_offset 
+        manip_goal.y = 0.0                          
+        manip_goal.z = (self.BLOCK_HEIGHT * 1000.0) - self.rpr_z_offset
 
         # send goal to action server and wait for completion
         self.rpr_client.send_goal(manip_goal)  
@@ -350,23 +368,28 @@ class Foreman:
 
     def rotate(self, goal_coordinate):
 
-        # get desired angle between cells
-        dx      =  goal_coordinate[0] - self.previous_waypoint[0]   
-        dy      =  goal_coordinate[1] - self.previous_waypoint[1]
-        theta   = atan2(dy, dx) 
-
-        # correct theta and set controller to track angle
-        self.controller.setPD(5,0) 
-        theta = nav_utilities.theta_correction(theta)
-        self.controller.setPoint(theta)
-
-        # track until threshold is reached       
-        while (self.pose.theta - theta) >= 0.1:
-
-            # update controller to track theta and publish velocities 
-            self.vel.angular.z = self.controller.update(self.pose.theta) 
+        for i in range(3):
+            self.vel.angular.z = -0.05 
             self.vel_pub.publish(self.vel)
             self.rate.sleep()
+
+        # get desired angle between cells
+        # dx      =  goal_coordinate[0] - self.previous_waypoint[0]   
+        # dy      =  goal_coordinate[1] - self.previous_waypoint[1]
+        # theta   = atan2(dy, dx) 
+
+        # correct theta and set controller to track angle
+        # self.controller.setPD(5,0) 
+        # theta = nav_utilities.theta_correction(theta)
+        # self.controller.setPoint(theta)
+
+        # # track until threshold is reached       
+        # while (self.pose.theta - theta) >= 0.1:
+
+        #     # update controller to track theta and publish velocities 
+        #     self.vel.angular.z = self.controller.update(self.pose.theta) 
+        #     self.vel_pub.publish(self.vel)
+        #     self.rate.sleep()
         
         self.vel.angular.z = 0
         self.vel_pub.publish(self.vel)
@@ -380,6 +403,12 @@ class Foreman:
     def getBlockOrientation(self): pass
 
 
+    def updateGUI(self):
+
+        for i in range(10):
+            self.gui_update_pub.publish(self.gui_state)
+            self.rate.sleep()
+
     """ ROS callback functions """
 
     def odom_callback(self, msg):
@@ -391,6 +420,8 @@ class Foreman:
         self.pose.x = msg.pose.pose.position.x
         self.pose.y = msg.pose.pose.position.y
 
+    def scan_callback(self, msg):
+        self.forward_distance = msg.data
 
 
 # """ temp main function for testing """

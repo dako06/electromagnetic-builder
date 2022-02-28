@@ -14,11 +14,10 @@ class ScanProcessor
 
     // declare static functions
 
+        size_t max_ix{30};
 
     private:
 
-        // angular limits to limit forward perspective 
-        std::vector <int>angular_constraints = {0, 30, 330, 359}; 
 
 
 

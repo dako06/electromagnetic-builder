@@ -8,19 +8,16 @@ class ImageProcessor:
     def __init__(self) -> None:
 
         # HSV color lower and upper thresholds  
-        self.block_filter_HSV = np.array(([110, 100, 20], [125, 255, 255]), dtype = "uint8")      
-        self.color_workspace = np.array(([170, 80, 20], [180, 255, 255]), dtype = "uint8")   
-        self.color_buildsite = np.array(([165, 90, 20], [170, 200, 255]), dtype = "uint8")  
+        self.block_filter_HSV           = np.array(([110, 100, 20], [120, 255, 255]), dtype = "uint8")      
+        self.electromagnet_filter_HSV   = np.array(([155, 100, 20], [170, 255, 255]), dtype = "uint8")           
+        # self.electromagnet_filter_HSV   = np.array(([170, 80, 20], [180, 255, 255]), dtype = "uint8")   
+        
+        
+        self.color_buildsite            = np.array(([165, 90, 20], [170, 200, 255]), dtype = "uint8")  
 
         # threshold used for filtering single block during pixel component analysis (element 0 is min and element 1 is max)
-        self.block_pixel_thresh = {'width':(50,70), 'height':(50,70), 'area':(2400,3100)}
+        self.block_pixel_thresh = {'width':(50,90), 'height':(50,90), 'area':(2400,3100)}
 
-
-    def compoundOpenImage(self, src):
-
-        img_erosion     = self.applyErosion(4, src, "cross")
-        opened_img      = self.applyDilation(2, img_erosion, "rectangle")
-        return opened_img
 
     def getConnectedComponents(self, img_binary, connectivity):
         """ @param binary - binary thresholded image
@@ -55,6 +52,7 @@ class ImageProcessor:
         (min_width, max_width)      = threshold.get('width')
         (min_height, max_height)    = threshold.get('height')
         (min_area, max_area)        = threshold.get('area')
+        print("threshold: ", threshold)
 
         # unpack connected component tuple 
         (label_count, label_matrix, stats, centroids) = comp_tuple
@@ -67,7 +65,8 @@ class ImageProcessor:
             w = stats[i, cv.CC_STAT_WIDTH]
             h = stats[i, cv.CC_STAT_HEIGHT]
             area = stats[i, cv.CC_STAT_AREA]
-            # print("width, height, area: %f, %f, %f" % (w,h,area)) # debug
+            print("width, height, area: %f, %f, %f" % (w,h,area)) # debug
+            
 
             # check that component satisfies thresholds
             if (w > min_width and w < max_width) and (h > min_height and h < max_height) and (area > min_area and area < max_area): 
@@ -84,8 +83,6 @@ class ImageProcessor:
         return comp_list, label_matrix  
 
 
-
-    
     def applyErosion(self, kernal_size, src, shape):
  
         if (shape=="rectangle"):
@@ -115,16 +112,52 @@ class ImageProcessor:
         return cv.dilate(src, element)
 
 
+    def compoundOpenImage(self, src_img):
 
-    def findBlock(self, src):
+        img_erosion     = self.applyErosion(4, src_img, "cross")
+        opened_img      = self.applyDilation(3, img_erosion, "rectangle")
+        return opened_img
 
-        mask = self.filterColor(src, self.color_block[0], self.color_block[1])
-        dst_erode = self.applyErosion(kernal_size=4, src=mask)
-        dst_dilate = self.applyDilation(kernal_size=5, src=dst_erode)
-        comp = self.getConnectedComponents(mask, connectivity=8)
-        x, y, w, h, cX, cY = self.filterComponents(comp)
+    """ tracking/detection functions """
 
-        bounding_rect = cv.rectangle(src, (x, y), (x + w, y + h), (0, 255, 0), 3)
+    def trackBlockTransport(self, src_img):
+
+        lower_mask = self.filterColor(src_img, self.block_filter_HSV[0], self.block_filter_HSV[1])
+        upper_mask = self.filterColor(src_img, self.electromagnet_filter_HSV[0], self.electromagnet_filter_HSV[1])
+        connection_mask = lower_mask + upper_mask 
+
+        opened_connection_mask = self.compoundOpenImage(connection_mask)
+
+        return opened_connection_mask
+
+
+
+    def detectBlocks(self, src_img):
+
+        ret_img = src_img.copy()
+
+        block_mask = self.filterColor(src_img, self.block_filter_HSV[0], self.block_filter_HSV[1])
+        opened_block_mask = self.compoundOpenImage(block_mask)
+
+        comp_list = self.getConnectedComponents(opened_block_mask, connectivity=8)
+        filtered_comp_list, label_matrix = self.filterComponents(comp_list, self.block_pixel_thresh)
+
+        for c in filtered_comp_list:
+
+            (x,y)       = c.get('xy')
+            (w,h)       = c.get('wh')
+            (cX, cY)    = c.get('centroid')
+            ix          = c.get('label_id')
+            print("x,y: %f, %f" % (x,y))
+            print("cX,cY: %f, %f" % (cX,cY))
+            print("w,h: %f, %f" % (w,h))
+
+            component_mask = (label_matrix == ix).astype("uint8") * 255
+            cv.circle(ret_img, (int(cX), int(cY)), 4, (0, 0, 255), -1)
+            cv.rectangle(ret_img, (x, y), (x + w, y + h), (0, 255, 0), 3)
+        # bounding_rect = cv.rectangle(src_img, (x, y), (x + w, y + h), (0, 255, 0), 3)
+
+        return ret_img
 
 
     def filterColor(self, img_bgr, lower, upper):

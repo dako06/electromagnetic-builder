@@ -29,9 +29,7 @@ class ManipulatorClient():
         # intialize goal data type
         manip_goal = RPRManipulatorGoal()
 
-        manip_goal.x = 1.0
-        manip_goal.y = 2.0
-        manip_goal.z = 3.0
+
 
         # send goal to action server and wait for completion
         self.client.send_goal(manip_goal)  

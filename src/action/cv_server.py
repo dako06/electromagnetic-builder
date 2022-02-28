@@ -24,7 +24,7 @@ class VisionActionServer(object):
     
     def __init__(self, name):
 
-        #### intialize server ####
+        # intialize server 
         self.action_name = name
         self.action_server = SimpleActionServer(self.action_name, VisionAction, execute_cb=self.execute_callback, auto_start = False)
         self.action_server.start()
@@ -34,7 +34,7 @@ class VisionActionServer(object):
         self.vel_pub            = rospy.Publisher("cmd_vel", Twist, queue_size=10)
         self.rate               = rospy.Rate(10)
         self.lin_vel_ref        = 0.17
-        self.scan_vel_ref       = 0.1
+        self.scan_vel_ref       = 0.01
 
         # odometry
         self.pose               = Pose2D()
@@ -116,7 +116,7 @@ class VisionActionServer(object):
 
             # set angular scan velocity direction
             if obj_position == "right": 
-                self.vel.angular.z = -1*self.scan_vel_ref
+                self.vel.angular.z = -1 * self.scan_vel_ref
             elif obj_position == "left":
                 self.vel.angular.z = self.scan_vel_ref
             elif obj_position == "center":

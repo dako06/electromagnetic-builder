@@ -7,4 +7,6 @@ float64 z
 bool complete
 ---
 #feedback
-float32 pct_complete
+float32 base_pct_complete
+float32 linear_actuator_pct_complete
+float32 end_pct_complete

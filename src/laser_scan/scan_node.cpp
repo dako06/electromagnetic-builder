@@ -2,11 +2,12 @@
 
 #include "ros/ros.h"
 #include "sensor_msgs/LaserScan.h"
-
 #include "scan_processor.hpp"
+#include "std_msgs/Float32.h"
 
 sensor_msgs::LaserScan scanMsg;
 ros::Subscriber scanSubscriber;
+ros::Publisher	processed_scan_pub;
 
 ScanProcessor scan_pro;
 
@@ -16,35 +17,37 @@ ScanProcessor scan_pro;
 
 void scanCallback (sensor_msgs::LaserScan scanMessage);
 
-int main(int argc, char **argv){
+int main(int argc, char **argv)
+{
 
 	std::cout << "Initializing scan processor\n"; 
 	
-	//initialize the ROS node
+	// initialize the ROS node
 	ros::init(argc, argv, "scan_sub_cpp");
 	ros::NodeHandle n;
 
 	// set scan subscribe 
-	scanSubscriber = n.subscribe("/scan", 10, scanCallback);
+	scanSubscriber 		= n.subscribe("/scan", 10, scanCallback);
+	processed_scan_pub 	= n.advertise<std_msgs::Float32>("scan_distance", 100);
+
 
 	ros::spin();
-
 }
 
-void scanCallback (sensor_msgs::LaserScan scanMessage){
+void 
+scanCallback (sensor_msgs::LaserScan scanMessage)
+{
+	std_msgs::Float32 dist;
 	
-
-	std::cout << "range array size: " << scanMessage.ranges.size() << std::endl;
-
-	for (int i{0}; i < 50 ; i++)
-	{
-		std::cout << "ranges[" << i << "]: " << scanMessage.ranges[i] << std::endl;
-	}
-
+	float sum{0};
 	
-	// cout<<"minimum range: " << getMinimumRange(scanMessage)<<endl;
-    // cout<<"maximum range: " << getMaximumRange(scanMessage)<<endl;
-    // cout<<"average range: " << getAverageRange(scanMessage,0,600)<<endl;
-    // cout<<endl;
+	for (size_t i{0}; i <= scan_pro.max_ix; i++)
+		sum += scanMessage.ranges[i];
+
+	float mean = sum / static_cast<float>(scan_pro.max_ix);
+
+	dist.data = mean;
+
+	processed_scan_pub.publish(dist);
 
 }

@@ -56,11 +56,10 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+  FILES
+  gui_state.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -117,7 +116,7 @@ generate_messages(
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES electromagnetic_builder
-  CATKIN_DEPENDS actionlib_msgs std_msgs roscpp rospy sensor_msgs system_lib# actionlib 
+  CATKIN_DEPENDS actionlib_msgs std_msgs roscpp rospy sensor_msgs system_lib message_runtime 
   DEPENDS system_lib
 )
 
@@ -142,6 +141,7 @@ include_directories(
 add_executable(scan_node_cpp src/laser_scan/scan_node.cpp)
 target_link_libraries(scan_node_cpp ${catkin_LIBRARIES})
 
+add_dependencies(scan_node_cpp ${catkin_EXPORTED_TARGETS})
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
