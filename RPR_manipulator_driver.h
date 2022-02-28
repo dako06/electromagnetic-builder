@@ -44,7 +44,7 @@ ArduinoQueue<Arm_Move_Command> Arm_Move_Queue(QUEUE_MAX_SIZE);
 /****** High-level arm motion functions ******/
 void Prepare_Arm_Motion(Arm_Move_Command cmd);
 void Queue_Return_To_Home();
-void Go_To_Home(); // Being replaced
+void Queue_LA_Homing();
 void Queue_Pick_Up_Block(float block_x, float block_z);
 void Queue_Simple_Move_To_Position(float goal_x, float goal_z);
 /****** Test functions ******/

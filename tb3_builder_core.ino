@@ -128,7 +128,7 @@ void loop()
   /**********************************************************************/
 
   /* If there is a move command in the queue and the arm is not currently moving, start the next motion */
-  if (!(base_is_moving || end_is_moving)) // || LA_is_moving || end_is_moving)) {
+  if (!(base_is_moving || LA_is_moving || end_is_moving))
   {
       if (!Arm_Move_Queue.isEmpty()) 
       {
@@ -150,6 +150,10 @@ void loop()
     /* base_is_moving is set true by whatever starts moving the arm, and is set false inside of Base_Servo_Move_Callback */
     if (base_is_moving) {
       Base_Servo_Move_Callback();
+    }
+
+    if (LA_is_moving) {
+      Lin_Act_Move_Callback();
     }
     
     /* end_is_moving is set true by whatever starts moving the arm, and is set false inside of End_Servo_Move_Callback */

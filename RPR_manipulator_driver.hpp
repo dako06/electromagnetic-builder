@@ -1,44 +1,5 @@
 #include "RPR_manipulator_driver.h"
 
-// All parameters should be in mm
-//void Queue_Pick_Up_Block(float block_x, float block_z) {
-//  // First move: move to a point 2 cm above the top of the block (given by block_z)
-//  // Use inverse kinematics to determine the required joint positions
-//  float start_x = block_x;
-//  float start_z = block_z + 20;
-//  float theta1 = atan2(start_z,start_x);
-//  float theta2 = start_x/cos(theta1) - L0;
-//  float theta3 = -1*theta1;
-//  int base_start_pos = Base_Rad_to_PWM(theta1);
-//  unsigned int LA_start_pos = theta2 * 100;
-//  int end_start_pos = End_Rad_to_PWM(theta3);
-//  Arm_Move_Command Move_1 = {base_start_pos, {LA_start_pos, false, 5}, end_start_pos};
-////  Arm_Move_Queue.enqueue(Move_1);
-//  // Second move: perform downward vertical motion to make contact with the block
-//  theta1 = atan2(block_z,block_x);
-//  theta2 = block_x/cos(theta1) - L0;
-//  theta3 = -1*theta1;
-//  float base_grab_pos = Base_Rad_to_PWM(theta1);
-//  float LA_grab_pos = theta2 * 100;
-//  float end_grab_pos = End_Rad_to_PWM(theta3);
-//  Arm_Move_Command Move_2 = {base_grab_pos, {LA_grab_pos, true, 0}, end_grab_pos};
-//  Arm_Move_Queue.enqueue(Move_2);
-//  // Third move: perform upward vertical motion to return to the start position
-//  Arm_Move_Command Move_3 = {base_start_pos, {LA_start_pos, true, 0}, end_start_pos};  
-//  Arm_Move_Queue.enqueue(Move_3);
-//}
-
-//void Queue_Simple_Move_To_Position(float goal_x, float goal_z) {
-//  float theta1 = atan2(goal_z,goal_x);
-//  float theta2 = goal_x/cos(theta1) - L0;
-//  float theta3 = -1*theta1;
-//  int base_goal_pos = Base_Rad_to_PWM(theta1);
-//  unsigned int LA_goal_pos = theta2 * 100;
-//  int end_goal_pos = End_Rad_to_PWM(theta3);
-//  Arm_Move_Command Move_1 = {base_goal_pos, {LA_goal_pos, false, LA_DEFAULT_VEL}, end_goal_pos};
-//  Arm_Move_Queue.enqueue(Move_1);
-//}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*********************************** Base servo functions ****************************************************/
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -138,6 +99,17 @@ void Start_LA_Homing() {
 }
 
 void Lin_Act_Move_Callback() {
+  if (LA_CNTRL_SERIAL.available()) {
+    //Serial.write(LA_CNTRL_SERIAL.read());
+    // Move complete or homing complete signal was received
+    if (LA_is_homing) {
+      LA_curr_position = 0; 
+      LA_is_homing = false;
+    }
+    LA_is_moving = false;
+    LA_CNTRL_SERIAL.flush();
+  }
+  /*
   // If homing is in progress, just wait for the HOMING_COMPLETE message
   // Otherwise, read any CURR_POSITION messages received from the Uno
     // Keep only the most recent CURR_POSITION message
@@ -175,6 +147,7 @@ void Lin_Act_Move_Callback() {
       }
     }
   }
+  */
 }
 
 void Prepare_LA_Move_Task(LA_Move_Command LA_cmd) {
@@ -249,7 +222,7 @@ float LA_Pos_mm() {
 }
 
 bool LA_Is_Valid_Position(unsigned int pos) {
- return (pos < (FULL_STROKE_STEPS - SAFETY_BUFFER_STEPS)) && (pos >= SAFETY_BUFFER_STEPS);
+ return pos < (FULL_STROKE_STEPS - SAFETY_BUFFER_STEPS);
 }
 
 unsigned int LA_Vel_To_Pulse_Width(float vel_in_mm_per_sec) {
@@ -332,11 +305,50 @@ void Queue_Return_To_Home() {
   Arm_Move_Command go_home = GO_HOME_CMD;
   Arm_Move_Queue.enqueue(go_home); 
 }
-//// Bring the linear actuator back until it trips the homing limit switch
-//void Queue_LA_Homing() {
-//  Arm_Move_Command test_homing = HOMING_CMD;
-//  Arm_Move_Queue.enqueue(test_homing);
-//}
+// Bring the linear actuator back until it trips the homing limit switch
+void Queue_LA_Homing() {
+ Arm_Move_Command test_homing = HOMING_CMD;
+ Arm_Move_Queue.enqueue(test_homing);
+}
+void Queue_Simple_Move_To_Position(float goal_x, float goal_z) {
+  float theta1 = atan2(goal_z,goal_x);
+  float theta2 = goal_x/cos(theta1) - L0;
+  float theta3 = -1*theta1;
+  int base_goal_pos = Base_Rad_to_PWM(theta1);
+  unsigned int LA_goal_pos = theta2 * 100;
+  int end_goal_pos = End_Rad_to_PWM(theta3);
+  Arm_Move_Command Move_1 = {ALL_JOINTS, base_goal_pos, {LA_goal_pos, DEFAULT_MODE, LA_DEFAULT_VEL}, end_goal_pos};
+  Arm_Move_Queue.enqueue(Move_1);
+}
+// All parameters should be in mm
+void Queue_Pick_Up_Block(float block_x, float block_z) {
+ // First move: move to a point 2 cm above the top of the block (given by block_z)
+ // Use inverse kinematics to determine the required joint positions
+ float start_x = block_x;
+ float start_z = block_z + 20;
+ float theta1 = atan2(start_z,start_x);
+ float theta2 = start_x/cos(theta1) - L0;
+ float theta3 = -1*theta1;
+ int base_start_pos = Base_Rad_to_PWM(theta1);
+ unsigned int LA_start_pos = theta2 * 100;
+ int end_start_pos = End_Rad_to_PWM(theta3);
+ Arm_Move_Command Move_1 = {ALL_JOINTS, base_start_pos, {LA_start_pos, DEFAULT_MODE, 8}, end_start_pos};
+//  Arm_Move_Queue.enqueue(Move_1);
+ // Second move: perform downward vertical motion to make contact with the block
+ theta1 = atan2(block_z,block_x);
+ theta2 = block_x/cos(theta1) - L0;
+ theta3 = -1*theta1;
+ float base_grab_pos = Base_Rad_to_PWM(theta1);
+ float LA_grab_pos = theta2 * 100;
+ float end_grab_pos = End_Rad_to_PWM(theta3);
+ //Arm_Move_Command Move_2 = {ALL_JOINTS, base_grab_pos, {LA_grab_pos, BLOCK_PLACE_MODE, 0}, end_grab_pos};
+ Arm_Move_Command Move_2 = {ALL_JOINTS, base_grab_pos, {LA_grab_pos, DEFAULT_MODE, 8}, end_grab_pos};
+ Arm_Move_Queue.enqueue(Move_2);
+ // Third move: perform upward vertical motion to return to the start position
+ //Arm_Move_Command Move_3 = {ALL_JOINTS, base_start_pos, {LA_start_pos, BLOCK_PLACE_MODE, 0}, end_start_pos};  
+ Arm_Move_Command Move_3 = {ALL_JOINTS, base_start_pos, {LA_start_pos, DEFAULT_MODE, 8}, end_start_pos};  
+ Arm_Move_Queue.enqueue(Move_3);
+}
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*********************************** Test functions **********************************************************/
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
