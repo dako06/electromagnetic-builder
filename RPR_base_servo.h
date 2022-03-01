@@ -2,7 +2,7 @@
 #define RPR_BASE_SERVO_H_
 
 Servo Base_joint;
-#define BASE_SIGNAL_PIN 3
+#define BASE_SIGNAL_PIN 5
 #define BASE_FEEDBACK_PIN A0
 #define BASE_MIN_PULSE_WIDTH 1200 // The mechanical limit is 900, but only part of the full range is used
 #define BASE_ZERO_POSITION_PULSE_WIDTH 1500
