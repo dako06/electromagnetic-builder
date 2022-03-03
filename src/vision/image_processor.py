@@ -11,9 +11,7 @@ class ImageProcessor:
         self.block_filter_HSV           = np.array(([110, 100, 20], [120, 255, 255]), dtype = "uint8")      
         self.electromagnet_filter_HSV   = np.array(([155, 100, 20], [170, 255, 255]), dtype = "uint8")           
         # self.electromagnet_filter_HSV   = np.array(([170, 80, 20], [180, 255, 255]), dtype = "uint8")   
-        
-        
-        self.color_buildsite            = np.array(([165, 90, 20], [170, 200, 255]), dtype = "uint8")  
+        # self.color_buildsite            = np.array(([165, 90, 20], [170, 200, 255]), dtype = "uint8")  
 
         # threshold used for filtering single block during pixel component analysis (element 0 is min and element 1 is max)
         self.block_pixel_thresh = {'width':(50,90), 'height':(50,90), 'area':(2400,3100)}

@@ -1,60 +1,51 @@
 #!/usr/bin/env python3
 
 from math import degrees, isnan
-from sre_parse import State
 import numpy as np
 import rospy 
 import smach
 
-
-
 # from math import atan, pi, sqrt, atan2, cos, sin
 # from sensor_msgs.msg import Image
 # from std_msgs.msg import Empty, String
-# from nav_msgs.msg import Odometry
-# from geometry_msgs.msg import Twist, Pose2D
 
 from foreman import Foreman
 
-""" global objects used throughout state machine """
-foreman             = Foreman()
+""" global objects """
+foreman     = Foreman()     # wrapper for lower level tasks and service requests
 
 
-
-
-
-""" SMACH state functions """
-
+""" SMACH state machine operations are contained within each classes execution function """
 
 class initializeBuilder(smach.State):
 
-    """ @note this is the initial state of electromangentic builder
-        initialize objects used throughout build protocal then move on to main transitions """
+    """ initial state of electromangentic builder. Prepare objects used throughout build protocol,
+        check blueprint is loaded properly, then move on to main process """
 
     def __init__(self):
+
         # intialize state class and its outcomes   
         smach.State.__init__(self, outcomes=['initialization_complete', 'startup_failure'])
 
     def execute(self, userdata):
 
         # send first gui state message
-        self.gui_state.state = "non_action"
-        foreman.updateGUI()
+        foreman.updateGUI("non_action")
 
-        """ Confirm blocks were succcesfully extracted from blueprint and intial block placement is known """
+        # read in and process raw blueprint file
+        fpath_blueprint_xlsx = '~/catkin_ws/src/electromagnetic_builder/blueprint_raw.xlsx'
         
-        total_block_sum = foreman.getBlockTotal()
-        # intial_block_coordinate = foreman.setNextBlockCoordinate()
-        # TODO report first block placement> xy in some space or index?
-
-        foreman.rotate(0)   # begin with rotation to 0 degrees
-
-        if isnan(total_block_sum) or total_block_sum==0:
+        # prepare and validate blueprint array 
+        if foreman.createBlueprint(fpath_blueprint_xlsx):
+            print('Blueprint array has been succesfully initialized.')
+            print("Initiating build protocal")
+            
+            return 'initialization_complete'
+        
+        else:
             print("ERROR: Problem determining number of blocks from blueprint.")
             return 'startup_failure'
-        else:
-            print("Blueprint contains %d blocks to place.\nInitiating build protocal." % total_block_sum)
-            return 'initialization_complete'
+
 
 
 class evaluateBuildStatus(smach.State):
@@ -63,25 +54,29 @@ class evaluateBuildStatus(smach.State):
         then continues build protocal if blocks remain """
 
     def __init__(self):
+
         # intialize state class, outcomes and userdata keys passed during transitions   
         smach.State.__init__(self, outcomes=['build_complete', 'build_incomplete'])
 
     def execute(self, userdata):
 
         # update gui status
-        self.gui_state.state = "non_action"
-        foreman.updateGUI()
+        foreman.updateGUI("non_action")
 
-        if foreman.getBlockTotal() == 0:
+        block_total = foreman.getBlockTotal() 
+
+        # check progress of build based on blocks remaining
+        if block_total == 0:
             print('There are no blocks remaining in blueprint.\nBuild is complete.')
             return 'build_complete'
             
         else:
    
-            print("Total blocks remaining in blueprint: %d" % foreman.getBlockTotal())
-            
-            # foreman.setNextBlockIndex()         # update block index to prepare for next block
-            # foreman.setNextBlockCoordinate()    # update current associated x,y coordinate based on block index
+            # update block index in blueprint array
+            foreman.setBlockIndex()         
+
+            print("Total blocks remaining in blueprint: %d" % block_total)
+            print("Block position index is set.")
 
             return 'build_incomplete'
 
@@ -143,11 +138,10 @@ class positionForExtraction(smach.State):
 
     def execute(self, userdata):
 
-        self.gui_state.state = "block_detection"
-        foreman.updateGUI()
+        foreman.updateGUI("block_detection")
 
         # find candidate blocks in the field 
-        block_centered = foreman.requestVisionAction('locate_block_candidate')   
+        block_centered = foreman.requestVisionAction('locate_block')   
         
         # return state machine transition
         if block_centered:
@@ -174,6 +168,10 @@ class extractBlock(smach.State):
             5. track end-effector while confirming connection with block """
     
     def execute(self, userdata):
+
+        # set coordinate estimate for extraction 
+        # block_coordinate = foreman.setBlockCoordinate() # update current associated x,y coordinate based on block index            
+
 
         # call action server to execute extraction at estimated block position
         block_extracted = foreman.requestBlockExtraction()

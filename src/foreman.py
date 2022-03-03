@@ -1,35 +1,28 @@
 #!/usr/bin/env python3
 
+import sys
+
+
+import sys
 import rospy
 import tf
-
+from actionlib import SimpleActionClient 
+from electromagnetic_builder.msg import RPRManipulatorGoal
+from electromagnetic_builder.msg import RPRManipulatorAction
+from electromagnetic_builder.msg import VisionAction
+from electromagnetic_builder.msg import VisionResult
+from electromagnetic_builder.msg import VisionGoal
+from electromagnetic_builder.msg import GUI_State
+from std_msgs.msg import Empty, Float32
+from geometry_msgs.msg import Twist, Pose2D
+from nav_msgs.msg import Odometry
 
 from math import pi, sqrt, atan2, cos, sin
 import pandas as pd
 import numpy as np
 
-
-from actionlib import SimpleActionClient 
-
-from electromagnetic_builder.msg import RPRManipulatorGoal
-from electromagnetic_builder.msg import RPRManipulatorAction
-
-from electromagnetic_builder.msg import VisionAction
-from electromagnetic_builder.msg import VisionResult
-from electromagnetic_builder.msg import VisionGoal
-
-from electromagnetic_builder.msg import gui_state
-
-
-from std_msgs.msg import Empty, Float32
-from geometry_msgs.msg import Twist, Pose2D
-from nav_msgs.msg import Odometry
-
-
-from utilities import grid, controller
-
-
-DEBUG = 1
+from utilities import controller
+# from utilities import grid use in mobile application only
 
 class Foreman:
 
@@ -38,55 +31,54 @@ class Foreman:
 
         """ ROS entities """
 
+        # initialize foreman node
         rospy.init_node('foreman_node', anonymous=True)
-        rospy.loginfo("Starting message: Press Ctrl + C to terminate")
+        rospy.loginfo("Foreman node activated: Press Ctrl + C to terminate")
 
-        self.gui_state      = gui_state()
-        self.gui_update_pub = rospy.Publisher("gui_state", gui_state, queue_size=10)
+        # publisher for updating GUI with current state
+        self.gui_update_pub = rospy.Publisher("gui_state", GUI_State, queue_size=10)
+        self.gui_state      = GUI_State(state="non_action")
 
-
-        # intialize rpr maniupulator client
+        # rpr maniupulator action client
         self.rpr_client = SimpleActionClient('rpr_manip_action', RPRManipulatorAction)
 
-        # intialize cv processing client
+        # computer vision processing client
         self.vision_client = SimpleActionClient('vision_action', VisionAction)
 
-        # navigation 
-        self.vel                = Twist()   
+        # navigation items
         self.vel_pub            = rospy.Publisher("cmd_vel", Twist, queue_size=10)
+        self.vel                = Twist()   
         self.rate               = rospy.Rate(10)
 
-        # odometry
-        self.pose               = Pose2D()
+        # odometry items
         self.odom_sub           = rospy.Subscriber("odom", Odometry, self.odom_callback)
+        self.pose               = Pose2D()
 
-        # processed scan
+        # LDS scan processer items 
         self.processed_scan_sub = rospy.Subscriber("scan_distance", Float32, self.scan_callback)
-        self.forward_distance   = 0
+        self.forward_distance   = np.NaN
 
-        # reset odometry to zero
-        # self.reset_pub = rospy.Publisher("mobile_base/commands/reset_odometry", Empty, queue_size=10)
-        # for i in range(10):
-        #     self.reset_pub.publish(Empty())
-        #     self.rate.sleep()
-
-
+   
         """ class members """
-        self.grid       = grid.Grid(3, 5, 0.5)
-        self.controller = controller.Controller()
+        self.controller = controller.Controller()   # PD controller for tracking angular velocity 
+        
+        # for mobile application only
+        # self.grid       = grid.Grid(3, 5, 0.5)      # grid for cell decomposition navigation (0.5 m x 0.5 m) 
 
+        """ unit converters """
+        self.INCH2METER = 0.0254    # inches to meters 
 
         """ constants """
 
-        # TODO move to grid
-        self.ROW_MAX        = 4
-        self.COL_MAX        = 4
-        self.INCH2METER         = 0.0254                # inches to meters 
+        # max build space is 4 rows (x) by 1 column (y) of block size
+        self.BUILD_DIM = (4, 1)
+
+        # known size of block stored in meters (length is along x-axis)
         self.BLOCK_LENGTH   = 1.5 * self.INCH2METER
         self.BLOCK_WIDTH    = 1.5 * self.INCH2METER
-
-
         self.BLOCK_HEIGHT   = 1.5 * self.INCH2METER
+
+        # rpr manipulator offsets
         self.rpr_z_offset   = 141                       # distance of rpr z origin above ground [mm]
         self.rpr_x_offset   = 60                        # distance from rpr base servo axis of rotation to LDS
         
@@ -96,103 +88,118 @@ class Foreman:
         self.time_extension     = 10    # splits T into discrete time elements 
         self.T                  = 2 
 
-
         """ member variables """
 
-        # navigation 
+        # maintained for continuous navigation 
         self.previous_waypoint  = [0,0]
         self.previous_velocity  = [0,0]
-        self.trajectory         = list()
         
-        # Blueprint
+        # blueprint file used to specify desired structure as scalars of height at each position
+        self.blueprint  = np.array([])  
 
-        # use file path to raw blueprint excel file and create blueprint as np array
-        self.fpath_blueprint_xlsx   = '~/catkin_ws/src/electromagnetic_builder/blueprint_raw.xlsx'
-        self.blueprint              = self.createBlueprint(self.fpath_blueprint_xlsx)
+        # maintains current progress of structure being built from blueprint
+        self.building   = np.array([]) 
 
-        """ iterator used to track index of current block position in blueprint array
-                the starting position in the array is (0,0) and represents the physical 
-                starting position in the build space which is the top left corner 
-                from the origin (0, ROW_MAX*BLOCK_LEN) + offset to estimate centroid of block top
-        """
+        """ Iterator for tracking index of current block to set in blueprint array.
+            The starting index in the build process is (ROW_MAX-1, 0),
+             and corresponds to the furthest position physically from the robot in the build space. """
+        
+        self.block_ix       = (self.BUILD_DIM[0] - 1, 0)
+        
+        
+        """ offset from measurement to center of block top (0, ROW_MAX*BLOCK_LEN) + offset to estimate centroid of block top   """
+        self.block_offset   = (self.BLOCK_LENGTH/2, 0)  # assumes robot is lined up along y-axis  
+        # self.block_offset   = (self.BLOCK_LENGTH/2, self.BLOCK_WIDTH/2) # used for mobile application  
+        
+        # estimated x,y,z coordinates of current block to place
+        self.block_coordinates = (0,0,0)  
 
-        self.current_block_ix = (0,0)
-        self.block_center_mask =  (self.BLOCK_WIDTH/2, self.BLOCK_LENGTH/2)  
-        self.current_block_xy = self.setNextBlockCoordinate() 
+
+        self.cv_commands = ['locate_block']
 
 
-        if (DEBUG):
-            print('Blueprint matrix has been initialized.')
-            print(self.blueprint)
+        self.DEBUG = True   # set for verbosity during initialization
+    
+        if self.DEBUG:
+            print("Starting block index: ", self.block_ix)
 
-            # try:
-            #     self.run()
-            # except rospy.ROSInterruptException:
-            #     rospy.loginfo("Action terminated.")
-            # finally:
-            #     pass
-            # save trajectory into csv file
-            # np.savetxt('trajectory.csv', np.array(self.trajectory), fmt='%f', delimiter=',')
 
-        self.cv_commands = ['locate_block_candidate']
-        # rospy.spin()
 
     """ blueprint functions """
 
-
     def createBlueprint(self, fpath):
-        """ construct blueprint """
-        blueprint_raw = pd.read_excel(io=fpath) # read in excel file as panda data structure
-        return np.array(blueprint_raw.values)   # convert to np array
- 
+        
+        """ construct blueprint using excel from @param:fpath """
+        
+        blueprint_raw   = pd.read_excel(io=fpath)                           # read in excel file as panda data structure
+        self.blueprint  = np.array(blueprint_raw.values, dtype=np.int32)    # store as np array
+        
+        # validate dimensions
+        r, c = self.blueprint.shape
+
+        if r > self.BUILD_DIM[0] or c > self.BUILD_DIM[1]:
+            print('ERROR: Blueprint dimensions do not match dimensions of build space at initialization.')
+            return False
+        else:
+            print('Dimensions of structure specified by blueprint: ', self.BUILD_DIM)
+
+        # validate block count
+        if self.getBlockTotal() == 0:        
+            print("ERROR: Blueprint contains 0 blocks at initialization.")
+            return False
+        else:
+            print("Blueprint contains %d blocks to set at initialization." % self.getBlockTotal())
+
+        # intialize build progess array to size of blueprint
+        self.building = np.zeros(self.blueprint.shape, dtype=np.int32)
+        
+        if (self.DEBUG):
+                print('Blueprint specification: \n', self.blueprint)
+                print('Current building progress: \n', self.building)
+
+        return True
 
     def getBlockTotal(self):
-            return np.sum(self.blueprint)
+        # maintain total blocks data type as int
+            return np.sum(self.blueprint, dtype=np.int32)
 
-    def setNextBlockIndex(self):
+    def setBlockIndex(self):
         """ @note update the index to point to the next block within the blueprint.
             if the current index is nonzero return since there is another block to place 
                 in the same position, otherwise move along columns first then row space  """
 
-        # i - row index and base y-coordinate
-        # j - column index and base x-coordinate
-        i, j = self.current_block_ix
+        # i - row index and base x-coordinate
+        # j - column index and base y-coordinate
+        i, j = self.block_ix
         
-        # check if there are blocks remaining to be stacked at this position
+        # return if there are blocks remaining at current position index
         if self.blueprint[i, j] != 0:
-            # dont adjust placement index
+            if (self.DEBUG):
+                print("Blocks remaining at current position index.", self.blueprint[i, j])
 
-            if (DEBUG):
-                print("Blocks left at this index: ", self.blueprint[i, j])
+        # adjust index until nonzero element breaks loop
+        while self.blueprint[i, j] == 0:
+
+            if i-1 >= 0:
+                i -= 1                      # iterate across row in reverse
+
+            elif i-1 < 0 and j+1 < self.BUILD_DIM[1]:
+                i = self.BUILD_DIM[0] - 1   # update row to max element 
+                j += 1                      # update to next column 
+
+            elif i-1 < 0 and j+1 >= self.BUILD_DIM[1]: 
+                # should not be reached since this implies 
+                print('ERROR: end of Blueprint reached when setting next block index.')
+
+        # update current index
+        self.block_ix = (i, j)              
+
+        if(self.DEBUG):
+            print("Updated block index: ", self.block_ix)
+
             
-            return 
 
-        else:
-
-            # adjust index until nonzero element breaks loop
-            while self.blueprint[i, j] == 0:
-
-                if j+1 < self.COL_MAX:
-                    j+=1  # iterate across column
-
-                elif j+1 >= self.COL_MAX and i+1 < self.ROW_MAX:
-                    i+=1    # update row 
-                    j=0     # reset column
-
-                elif j+1 >= self.COL_MAX and i+1 >= self.ROW_MAX: 
-                    print('ERROR: end of Blueprint reached when setting next block index.')
-
-
-            self.current_block_ix = (i,j)   # update current index
-
-            if(DEBUG):
-                print("updated block index: ", self.current_block_ix)
-                print("updated (x,y) coordinate: ", self.current_block_xy)
-
-            return 
-
-
-    def setNextBlockCoordinate(self):
+    def setBlockCoordinate(self):
         """ set the (x,y) coordinate corresponding to the current blueprint block index
                 x - row index * block width + x offset from origin
                 y - (row max - column index - 1) * block length + y offset from origin   """
@@ -207,32 +214,32 @@ class Foreman:
 
     def requestVisionAction(self, command):
 
-        # confirm valid command is requested
+        # validate command request
         if command not in self.cv_commands:
-            print("Error: Incorrect Action command given for vision server")
-            return False
-            
-        vis_goal    = VisionGoal(command=command)          # intialize goal data type
-        result  = VisionResult()
+            rospy.logerr("Incorrect command requested by vision client")
+            sys.exit("Exiting program")
+
+        # initialize goal message 
+        vis_goal    = VisionGoal(command=command)          
+        result      = VisionResult()
         
-        self.vision_client.wait_for_server()        # wait for server to prepare for goals    
+        self.vision_client.wait_for_server()        # wait until server is ready     
         self.vision_client.send_goal(vis_goal)      # request goal from server
         self.vision_client.wait_for_result()        # wait for execution
 
-        # get result from server [is_found, level]
+        # get result from server 
         result = self.vision_client.get_result() 
 
-        if result.is_found:
-
+        # check boolean field of returned result message  
+        if result.execution_status:
+            
             print('Block candiate succesfully found')
             print('Objects centroid: %f %f' % (result.centroid_x, result.centroid_y))
             print('pixel area: ', result.pixel_area)
             # set next block coordinates and orientation for adjustment to block
 
-
-
         # return result to state machine
-        return result.is_found
+        return result.execution_status
 
 
     def requestBlockExtraction(self):
@@ -403,7 +410,9 @@ class Foreman:
     def getBlockOrientation(self): pass
 
 
-    def updateGUI(self):
+    def updateGUI(self, state_update):
+        
+        self.gui_state.state = state_update
 
         for i in range(10):
             self.gui_update_pub.publish(self.gui_state)
@@ -424,24 +433,27 @@ class Foreman:
         self.forward_distance = msg.data
 
 
-# """ temp main function for testing """
-# if __name__ == '__main__':
+""" main function for testing only """
+if __name__ == '__main__':
     
-    # foreman = Foreman()
+    foreman = Foreman()
+    fpath_blueprint_xlsx = '~/catkin_ws/src/electromagnetic_builder/blueprint_raw.xlsx'
+    foreman.createBlueprint(fpath_blueprint_xlsx)
+    total_block_sum = foreman.getBlockTotal()
+    
+    block_coordinate = foreman.setNextBlockCoordinate()
 
+
+
+    # Astar and cell decomposition navigation test
     # start       = foreman.grid.getCurrent()
     # # goal        = foreman.grid.getGoal("block_storage")
     # goal        = foreman.grid.getGoal("platform")
-
     # print("start: ", start)
     # print("goal: ", goal)
     # # print("obstacles: ", foreman.grid.obstacles)
-
-    
     # waypoints   = foreman.grid.get_path_from_A_star(start, goal, foreman.grid.obstacles)
-
     # print("waypoints:", waypoints)
-
     # result = foreman.executeTrajectory(waypoints)
 
 

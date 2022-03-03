@@ -17,7 +17,7 @@ import numpy as np
 from math import pi
 from cv_bridge import CvBridge, CvBridgeError
 
-from utilities import decision_switch, controller, nav_utilities
+from utilities import controller, nav_utilities
 from vision import image_buffer, image_processor, pixel_grid
 
 class VisionActionServer(object):
@@ -34,7 +34,7 @@ class VisionActionServer(object):
         self.vel_pub            = rospy.Publisher("cmd_vel", Twist, queue_size=10)
         self.rate               = rospy.Rate(10)
         self.lin_vel_ref        = 0.17
-        self.scan_vel_ref       = 0.01
+        self.scan_vel_ref       = 0.1
 
         # odometry
         self.pose               = Pose2D()
@@ -47,11 +47,9 @@ class VisionActionServer(object):
         # support objects for image processing
         self.controller = controller.Controller()
         self.img_pro    = image_processor.ImageProcessor()
-        self.img_buffer = image_buffer.ImageBuffer(5)
+        self.img_buffer = image_buffer.ImageBuffer(10)
         self.pix_grid   = pixel_grid.PixelGrid((480,640), 4)
 
-        self.cmd_dict   = ["locate_block"]
-        self.dswitch    = decision_switch.DecisionBlock(self.cmd_dict)
 
     def execute_callback(self, goal):
         
@@ -65,16 +63,14 @@ class VisionActionServer(object):
 
             rospy.loginfo('%s: Scanning field for object' % self.action_name)
 
-            execution_status, obj_comp_stats = self.fieldScan(self.impro.block_filter_HSV)
-            result.is_found = execution_status
-            result.values 
+            execution_status, obj_comp_stats = self.fieldScan(self.img_pro.block_filter_HSV)
+            result.execution_status = execution_status
 
             # TODO check if its stacked and return level 
 
 
-
         # return server outcome
-        if result.is_found:
+        if result.execution_status:
             rospy.loginfo('%s: Succeeded' % self.action_name)
             self.action_server.set_succeeded(result)
         
@@ -91,7 +87,9 @@ class VisionActionServer(object):
 
 
     def fieldScan(self, filter):
-        """ @param filter: use filter to rotate and scan field for object """
+        """ @param filter: filter used as identification during field scan 
+            @note this function commands the robot to scan the field until an object is
+                identified by the filter and its centered with the forward direction of the robot """
 
         theta_sum, theta_prev, theta_i = 0, 0, 0
         
@@ -99,32 +97,38 @@ class VisionActionServer(object):
 
         while obj_position != "center" and theta_sum < 2*pi:
             
-            is_img, img = self.img_buffer.getImg()
+            is_img, img = self.img_buffer.popImg()
 
             # skip if image is not available
             if not is_img:
                 continue
+
+            # apply color filter to image
+            mask = self.img_pro.filterColor(img, filter[0], filter[1])                   
             
-            # self.img_pro.displayImg("temp", img, "temp.png")
+            # apply compound open to image to remove outliers
+            opened_mask = self.img_pro.compoundOpenImage(mask)                                  
+            
+            # get connected components
+            comp = self.img_pro.getConnectedComponents(opened_mask, connectivity=8)      
+            
+            # filter outlier components
+            comp_list, label_matrix = self.img_pro.filterComponents(comp, self.img_pro.block_pixel_thresh)  
 
-            mask                    = self.img_pro.filterColor(img, filter[0], filter[1])                   # apply color filter to mask
-            opened_mask             = self.img_pro.compoundOpenImage(mask)                                  # open image to remove outliers
-            comp                    = self.img_pro.getConnectedComponents(opened_mask, connectivity=8)      # get connected components
-            comp_list, label_matrix = self.img_pro.filterComponents(comp, self.img_pro.block_pixel_thresh)  # filter outlier components
-
+            # find nearest connected component to base pixel
             obj_position, nearest_comp  = self.pix_grid.findNearestObject(comp_list) 
 
             # set angular scan velocity direction
             if obj_position == "right": 
                 self.vel.angular.z = -1 * self.scan_vel_ref
-            elif obj_position == "left":
+            elif obj_position == "left" or obj_position == "unknown":
                 self.vel.angular.z = self.scan_vel_ref
             elif obj_position == "center":
                 self.vel.angular.z = 0
 
             # update theta for angle loop condition 
             theta_i     = self.pose.theta
-            theta_sum  += (theta_i-theta_prev)
+            theta_sum  += abs(theta_i-theta_prev)
             theta_prev  = theta_i
 
             # publish angular velocity
@@ -148,12 +152,8 @@ class VisionActionServer(object):
         except CvBridgeError as e:
             print(e)
 
-        cv_image_copy = cv_image.copy()
-        
-        if cv_image_copy is None:
-            return
-        else:
-            self.img_buffer.assignImg(img.copy()) 
+        self.img_buffer.pushImg(cv_image)
+
 
     def odom_callback(self, msg):
         # get pose = (x, y, theta) from odometry topic
@@ -165,10 +165,8 @@ class VisionActionServer(object):
         self.pose.y = msg.pose.pose.position.y
 
 
-
-
 if __name__ == '__main__':
 
-    #### intialize server node and class ####
+    # intialize server node and class 
     rospy.init_node('vision_action')
-    nav_server = VisionActionServer(rospy.get_name())
+    cv_server = VisionActionServer(rospy.get_name())

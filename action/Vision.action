@@ -2,7 +2,7 @@
 string command
 ---
 #result definition
-bool is_found
+bool execution_status
 int32 level
 float32 centroid_x
 float32 centroid_y
