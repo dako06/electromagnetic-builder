@@ -220,7 +220,8 @@ class Foreman:
             sys.exit("Exiting program")
 
         # initialize goal message 
-        vis_goal    = VisionGoal(command=command)          
+        vis_goal    = VisionGoal()
+        vis_goal.command = command          
         result      = VisionResult()
         
         self.vision_client.wait_for_server()        # wait until server is ready     

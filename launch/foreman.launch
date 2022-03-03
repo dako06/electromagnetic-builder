@@ -1,0 +1,17 @@
+<launch>
+
+
+  <node pkg="electromagnetic_builder" type="GUI.py" name="GUI" output="screen">
+  </node>
+
+  <node pkg="electromagnetic_builder" type="scan_node_cpp" name="scan_node" output="screen">
+  </node>
+
+  <node pkg="electromagnetic_builder" type="rpr_manip_server.py" name="rpr_manip_server" output="screen">
+  </node>
+
+  <node pkg="electromagnetic_builder" type="sm_node.py" name="sm_node" output="screen">
+  </node>
+
+  
+</launch>

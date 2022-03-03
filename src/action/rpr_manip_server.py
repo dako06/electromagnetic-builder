@@ -16,7 +16,7 @@ from std_msgs.msg import Int32MultiArray, Float64MultiArray
 class ManipulatorActionServer(object):
     
 
-    def __init__(self, name):
+    def __init__(self):
 
         # initialize ROS node 
         rospy.init_node('rpr_manip_action')
@@ -125,13 +125,14 @@ class ManipulatorActionServer(object):
 if __name__ == '__main__':
 
     # intialize server node and class 
-
-    try:
-        rpr_server = ManipulatorActionServer()
-    except rospy.ROSInterruptException:
-        rospy.loginfo("Action terminated.")
-    finally:
-        # save trajectory into csv file
-        np.savetxt('joint_debug.csv', np.array(rpr_server.joint_data), fmt='%f')
-    
+    rpr_server = ManipulatorActionServer()
     rospy.spin()
+
+    # try:
+    # except rospy.ROSInterruptException:
+    #     rospy.loginfo("Action terminated.")
+    # finally:
+    #     pass
+    #     # save trajectory into csv file
+        # np.savetxt('joint_debug.csv', np.array(rpr_server.joint_data), fmt='%f')
+    

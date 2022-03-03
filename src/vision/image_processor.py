@@ -13,8 +13,14 @@ class ImageProcessor:
         # self.electromagnet_filter_HSV   = np.array(([170, 80, 20], [180, 255, 255]), dtype = "uint8")   
         # self.color_buildsite            = np.array(([165, 90, 20], [170, 200, 255]), dtype = "uint8")  
 
-        # threshold used for filtering single block during pixel component analysis (element 0 is min and element 1 is max)
-        self.block_pixel_thresh = {'width':(50,90), 'height':(50,90), 'area':(2400,3100)}
+        """ thresholds for filtering objects in pixel space
+                (element 0 is min and element 1 is max)     """
+
+        # single block 
+        self.block_thresh = {'width':(50,90), 'height':(50,90), 'area':(2400,3100)}
+        
+        # block and electromagnet connection 
+        self.block_emag_thresh = {'width':(50,90), 'height':(50,90), 'area':(2400,3100)}
 
 
     def getConnectedComponents(self, img_binary, connectivity):
@@ -46,15 +52,15 @@ class ImageProcessor:
 	                                h = stats[i, cv2.CC_STAT_HEIGHT]    - height of the component
 	                                area = stats[i, cv2.CC_STAT_AREA]   - area (in pixels)  """
         
-        # get boundaries from dictionary
+        # get upper and lower bounds from threshold dictionary
         (min_width, max_width)      = threshold.get('width')
         (min_height, max_height)    = threshold.get('height')
         (min_area, max_area)        = threshold.get('area')
-        print("threshold: ", threshold)
+        # print("threshold: ", threshold)
 
         # unpack connected component tuple 
         (label_count, label_matrix, stats, centroids) = comp_tuple
-
+        print("labels", label_count)
         comp_list = []
 
         # iterate over number of components (hard coded to ignore background)
@@ -138,7 +144,7 @@ class ImageProcessor:
         opened_block_mask = self.compoundOpenImage(block_mask)
 
         comp_list = self.getConnectedComponents(opened_block_mask, connectivity=8)
-        filtered_comp_list, label_matrix = self.filterComponents(comp_list, self.block_pixel_thresh)
+        filtered_comp_list, label_matrix = self.filterComponents(comp_list, self.block_thresh)
 
         for c in filtered_comp_list:
 

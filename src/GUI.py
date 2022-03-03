@@ -42,8 +42,8 @@ class GUI:
             print(e)
 
         # update state variable
-        state = "track_block_transport"
-        # state = self.gui_state.state
+        # state = "track_block_transport"
+        state = self.gui_state.state
         
         # process image  
         if state == "block_detection":
@@ -63,7 +63,7 @@ class GUI:
 
     def gui_state_callback(self, msg):
         # update gui state based on sm node transitions
-        self.current_state.state = msg.state
+        self.gui_state.state = msg.state
 
 if __name__ == '__main__':
 

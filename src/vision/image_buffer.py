@@ -14,10 +14,6 @@ class ImageBuffer:
 
     def pushImg(self, img):
 
-        # return if invalid object is recieved
-        if img == None: 
-            return 
-
         img_copy = img.copy()
 
         # if queue is full then make space for update
@@ -29,9 +25,8 @@ class ImageBuffer:
 
     def popImg(self):
         
-        if (self.item_count > 0):
+        if (len(self.img_queue)  > 0):
             
-            self.item_count = len(self.img_queue) 
             return (True, self.img_queue.popleft())
 
         else:

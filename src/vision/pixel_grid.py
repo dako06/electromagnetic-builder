@@ -80,15 +80,14 @@ class PixelGrid:
             @note identify the nearest point and return the direction w.r.t the center of image frame and the pixel coordinates """
         
         if len(compenent_list) == 0:
-            return "empty", [], False
+            return "unknown", []
 
         # sort components based nearest pixel space distance 
         compenent_list.sort(key = lambda x: self.pixelDistanceHeuristic(x.get('centroid')))
-        # compenent_list.sort(key = lambda x: print(x.get('centroid')))
         
         # check if objects centroid is already centered 
         nearest_comp   = compenent_list.pop(0)
-        cx, cy         = nearest_comp.get("centroid")
+        cx, cy         = nearest_comp.get("centroid")   # x-axis = column space, y-axis = row space
 
         if (cx > self.center_column_window[0]) and (cx < self.center_column_window[1]):
             

@@ -3,15 +3,11 @@
 import rospy
 import tf
 
-from std_msgs.msg import Empty
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist, Pose2D
 from actionlib import SimpleActionServer 
 from sensor_msgs.msg import Image
-
-from electromagnetic_builder.msg import VisionFeedback
-from electromagnetic_builder.msg import VisionAction
-from electromagnetic_builder.msg import VisionResult
+from electromagnetic_builder.msg import VisionFeedback, VisionAction, VisionResult
 
 import numpy as np
 from math import pi
@@ -22,10 +18,13 @@ from vision import image_buffer, image_processor, pixel_grid
 
 class VisionActionServer(object):
     
-    def __init__(self, name):
+    def __init__(self):
+
+        # initialize ROS node 
+        rospy.init_node('vision_action')
 
         # intialize server 
-        self.action_name = name
+        self.action_name = rospy.get_name()
         self.action_server = SimpleActionServer(self.action_name, VisionAction, execute_cb=self.execute_callback, auto_start = False)
         self.action_server.start()
 
@@ -34,7 +33,7 @@ class VisionActionServer(object):
         self.vel_pub            = rospy.Publisher("cmd_vel", Twist, queue_size=10)
         self.rate               = rospy.Rate(10)
         self.lin_vel_ref        = 0.17
-        self.scan_vel_ref       = 0.1
+        self.scan_vel_ref       = 0.5
 
         # odometry
         self.pose               = Pose2D()
@@ -95,14 +94,15 @@ class VisionActionServer(object):
         
         obj_position = "unknown"
 
-        while obj_position != "center" and theta_sum < 2*pi:
+        while obj_position != "center" and theta_sum < 2*pi and not rospy.is_shutdown():
             
             is_img, img = self.img_buffer.popImg()
 
             # skip if image is not available
             if not is_img:
+                rospy.loginfo('image is invalid')
                 continue
-
+ 
             # apply color filter to image
             mask = self.img_pro.filterColor(img, filter[0], filter[1])                   
             
@@ -113,11 +113,12 @@ class VisionActionServer(object):
             comp = self.img_pro.getConnectedComponents(opened_mask, connectivity=8)      
             
             # filter outlier components
-            comp_list, label_matrix = self.img_pro.filterComponents(comp, self.img_pro.block_pixel_thresh)  
+            comp_list, label_matrix = self.img_pro.filterComponents(comp, self.img_pro.block_thresh)  
 
             # find nearest connected component to base pixel
             obj_position, nearest_comp  = self.pix_grid.findNearestObject(comp_list) 
 
+            print("obj position:", obj_position)
             # set angular scan velocity direction
             if obj_position == "right": 
                 self.vel.angular.z = -1 * self.scan_vel_ref
@@ -125,6 +126,8 @@ class VisionActionServer(object):
                 self.vel.angular.z = self.scan_vel_ref
             elif obj_position == "center":
                 self.vel.angular.z = 0
+
+            print("self.vel.angular.z:", self.vel.angular.z)
 
             # update theta for angle loop condition 
             theta_i     = self.pose.theta
@@ -149,10 +152,11 @@ class VisionActionServer(object):
         
         try:
             cv_image = self.cv_bridge.imgmsg_to_cv2(img, "bgr8")
+            self.img_buffer.pushImg(cv_image)
+        
         except CvBridgeError as e:
             print(e)
 
-        self.img_buffer.pushImg(cv_image)
 
 
     def odom_callback(self, msg):
@@ -168,5 +172,5 @@ class VisionActionServer(object):
 if __name__ == '__main__':
 
     # intialize server node and class 
-    rospy.init_node('vision_action')
-    cv_server = VisionActionServer(rospy.get_name())
+    cv_server = VisionActionServer()
+    rospy.spin()
