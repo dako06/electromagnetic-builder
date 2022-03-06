@@ -42,8 +42,8 @@ class GUI:
             print(e)
 
         # update state variable
-        # state = "track_block_transport"
-        state = self.gui_state.state
+        state = "block_detection"
+        # state = self.gui_state.state
         
         # process image  
         if state == "block_detection":
@@ -55,10 +55,13 @@ class GUI:
         elif state == "non_action":
             img = cv_image
 
+        self.img_pro.displayImg("test_window", cv_image, "label_test_9a.png")
+        # self.img_pro.displayImg("test_window", cv_image, "label_test_9b.png")
+
         # refresh window
-        cv.imshow(self.gui_name, img)
-        cv.waitKey(self.refresh)
-        self.rate.sleep()     
+        # cv.imshow(self.gui_name, img)
+        # cv.waitKey(self.refresh)
+        # self.rate.sleep()     
 
 
     def gui_state_callback(self, msg):

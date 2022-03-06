@@ -33,7 +33,7 @@ class VisionActionServer(object):
         self.vel_pub            = rospy.Publisher("cmd_vel", Twist, queue_size=10)
         self.rate               = rospy.Rate(10)
         self.lin_vel_ref        = 0.17
-        self.scan_vel_ref       = 0.5
+        self.scan_vel_ref       = 0.1
 
         # odometry
         self.pose               = Pose2D()

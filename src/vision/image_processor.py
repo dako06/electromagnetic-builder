@@ -2,23 +2,33 @@
 
 import cv2 as cv
 import numpy as np
+from block import Block
+
+from pixel_grid import PixelGrid
 
 class ImageProcessor:
 
     def __init__(self) -> None:
 
-        # HSV color lower and upper thresholds  
-        self.block_filter_HSV           = np.array(([110, 100, 20], [120, 255, 255]), dtype = "uint8")      
-        self.electromagnet_filter_HSV   = np.array(([155, 100, 20], [170, 255, 255]), dtype = "uint8")           
-        # self.electromagnet_filter_HSV   = np.array(([170, 80, 20], [180, 255, 255]), dtype = "uint8")   
-        # self.color_buildsite            = np.array(([165, 90, 20], [170, 200, 255]), dtype = "uint8")  
+        # HSV color filters with lower and upper thresholds  
+        self.block_filter_HSV  = {'lower':np.array([100, 90, 20], dtype = "uint8"), \
+                                    'upper':np.array([120, 255, 255],  dtype = "uint8")}
+
+
+        self.emag_filter_HSV   = {'lower':np.array([155, 100, 20], dtype = "uint8"), \
+                                'upper':np.array([170, 255, 255],  dtype = "uint8")}
+
+        self.pix_grid = PixelGrid((480, 640), 25)
 
         """ thresholds for filtering objects in pixel space
                 (element 0 is min and element 1 is max)     """
-
         # single block 
-        self.block_thresh = {'width':(50,90), 'height':(50,90), 'area':(2400,3100)}
-        
+        self.block_thresh = {'width':(45,175), 'height':(45,140), 'area':(4000,20000)}
+        self.metal_thresh = {'width':(20,50), 'height':(10,50), 'area':(200,2000)}
+
+        self.block_open_param = {'erosion':2, 'dilation':3}
+        self.metal_open_param = {'erosion':3, 'dilation':4}
+
         # block and electromagnet connection 
         self.block_emag_thresh = {'width':(50,90), 'height':(50,90), 'area':(2400,3100)}
 
@@ -37,12 +47,9 @@ class ImageProcessor:
         if (connectivity != 4 and connectivity != 8):
             connectivity = 8
 
-        (numLabels, labels, stats, centroids) = cv.connectedComponentsWithStats(img_binary, connectivity, cv.CV_32S)
-        # print("number of components: ", numLabels)
+        # features to return (numLabels, labels, stats, centroids)
+        return cv.connectedComponentsWithStats(img_binary, connectivity, cv.CV_32S)
 
-        return (numLabels, labels, stats, centroids)
-        
-  
     def filterComponents(self, comp_tuple, threshold):
         """ @param comp_tuple:      4-tuple containing connected components and there statistics
             @param threshold:       threshold used for filtering as a dict
@@ -56,35 +63,195 @@ class ImageProcessor:
         (min_width, max_width)      = threshold.get('width')
         (min_height, max_height)    = threshold.get('height')
         (min_area, max_area)        = threshold.get('area')
-        # print("threshold: ", threshold)
 
         # unpack connected component tuple 
-        (label_count, label_matrix, stats, centroids) = comp_tuple
-        print("labels", label_count)
-        comp_list = []
+        (label_count, _, stats, centroids) = comp_tuple
 
-        # iterate over number of components (hard coded to ignore background)
-        for i in range(1, label_count):
+        # store inlier indices
+        inlier_labels = []
 
-            w = stats[i, cv.CC_STAT_WIDTH]
-            h = stats[i, cv.CC_STAT_HEIGHT]
-            area = stats[i, cv.CC_STAT_AREA]
-            print("width, height, area: %f, %f, %f" % (w,h,area)) # debug
-            
+        # iterate over number of components 
+        for ix in range(0, label_count):
+
+            w, h    = stats[ix, cv.CC_STAT_WIDTH], stats[ix, cv.CC_STAT_HEIGHT]
+            area    = stats[ix, cv.CC_STAT_AREA]
 
             # check that component satisfies thresholds
-            if (w > min_width and w < max_width) and (h > min_height and h < max_height) and (area > min_area and area < max_area): 
+            if (w >= min_width and w <= max_width) and (h >= min_height and h <= max_height) and (area >= min_area and area <= max_area): 
+                
+                inlier_labels.append(ix) # add inlier index
 
-                comp_dim = {'xy': (stats[i, cv.CC_STAT_LEFT], stats[i, cv.CC_STAT_TOP]), \
-                            'wh':(w,h), 'centroid':(centroids[i]), 'area':area, 'label_id':i}
+        return inlier_labels
 
-                comp_list.append(comp_dim)
 
-                # print("x, y : ", comp_dim.get('xy'))                
-                # print("w, h : ", comp_dim.get('wh')) 
-                # print("centroid : ", comp_dim.get('centroid')) 
 
-        return comp_list, label_matrix  
+    """ tracking/detection functions """
+
+    def trackBlockTransport(self, src_img):
+
+        lower_mask = self.filterColor(src_img, self.block_filter_HSV)
+        upper_mask = self.filterColor(src_img, self.emag_filter_HSV)
+        connection_mask = lower_mask + upper_mask 
+
+        opened_connection_mask = self.compoundOpenImage(connection_mask)
+
+        return opened_connection_mask
+
+    def matchComponents(self, comp_p, inlier_ix_p, comp_s, inlier_ix_s):
+
+        # return if there are not sufficient components
+        if len(inlier_ix_p) == 0 or len(inlier_ix_s) == 0:
+            return []
+
+        block_list   = []    # list of running block objects to return   
+        matched_ix   = []    # list of associated indices to prevent over-processing
+        
+        # extract component containers 
+        (_, label_matrix_p, stats_p, centroids_p) = comp_p  # primary blobs
+        (_, label_matrix_s, stats_s, centroids_s) = comp_s  # sub blobs
+        
+        # iterate over each inlier label to access inlier primary components
+        for ix_p in inlier_ix_p:
+
+            # construct pixel space geofence for filtering sub-blobs
+            w_p, h_p        = stats_p[ix_p, cv.CC_STAT_WIDTH], stats_p[ix_p, cv.CC_STAT_HEIGHT]
+            min_xp, min_yp  = stats_p[ix_p, cv.CC_STAT_LEFT], stats_p[ix_p, cv.CC_STAT_TOP]
+            pixel_geofence  = {'min_coordinate': (min_xp, min_yp), 'max_coordinate': (min_xp + w_p, min_yp + h_p)}
+
+            # store all associations to this primary blob
+            association_list = []
+            
+            # compare non-associated sub-blobs to current primary
+            for ix_s in inlier_ix_s:
+
+                # skip if label has already been associated
+                if ix_s in matched_ix:
+                    continue  
+
+                # get pixel features used for matching test
+                cX_s, cY_s  = centroids_s[ix_s]
+                w_s, h_s    = stats_s[ix_s, cv.CC_STAT_WIDTH], stats_s[ix_s, cv.CC_STAT_HEIGHT]
+                x_s, y_s    = stats_s[ix_s, cv.CC_STAT_LEFT], stats_s[ix_s, cv.CC_STAT_TOP]
+
+                # check that sub blob is within primary blob
+                if self.isBlobInBlob(pixel_geofence, (cX_s, cY_s), (w_s/2, h_s/2)):
+
+                    blob_dict = {'p_min': (x_s, y_s), 'p_max': (x_s+w_s, y_s+h_s), 'width':w_s, 'height':h_s, \
+                                'centroid':(cX_s, cY_s), 'area':stats_s[ix_s, cv.CC_STAT_AREA], 'label_id':ix_s}
+                    
+                    association_list.append(blob_dict)  # add index to associations for this primary iteration 
+                    matched_ix.append(ix_s)          # add sub blob index to known associations
+
+            # if number of associations is reasonable then keep label composition
+            if len(association_list) > 0 and len(association_list) <= 3:
+
+                label_matrix_p + label_matrix_s
+
+                # construct block and add to list
+                block = Block(width=w_p, height=h_p, area=stats_p[ix_p, cv.CC_STAT_AREA], centroid=centroids_p[ix_p], p_o=(min_xp, min_yp))
+                block.addMetalBlob(association_list)    # add composition to success list  
+                block_list.append(block)                # update associated metal indices  
+        
+        return block_list
+        # get the first blob within the primary object set
+        # prime_blob = (label_mat_p == ix_p).astype("uint8") * 255
+        # sub_blob = (label_mat_s == ix_s).astype("uint8") * 255
+        # mask = cv.bitwise_or(mask, componentMask)
+        # self.displayImg("component mask from label", comp_mask, 'img')  
+
+    def isBlobInBlob(self, pixel_GF, centroid, radius):
+
+        # get min and max pixel geofence coordinates
+        min_x, min_y    = pixel_GF.get('min_coordinate')
+        max_x, max_y    = pixel_GF.get('max_coordinate')
+        
+        # get centroid to test position within blob 
+        (cx, cy)        = centroid
+        dx, dy          = radius
+
+        # print("centroid: (%f, %f)" % (cx, cy))
+        # print("geofence points:")
+        # print("1. (%f, %f) \t2. (%f, %f)" % (min_x, min_y, max_x, min_y))
+        # print("3. (%f, %f) \t4. (%f, %f)" % (min_x, max_y, max_x, max_y))
+
+        # test secondary centroid position with respect to geofence 
+        if (cx > min_x and cy > min_y) and (cx < max_x and cy > min_y) and (cx > min_x and cy < max_y) and (cx < max_x and cy < max_y):
+            centroid_test = True
+        else: 
+            centroid_test = False
+
+        # if cx + dx < max_x and cx - dx > min_x and cy + dy < max_y and cy - dy > min_y:   
+        #     boundary_test = True
+        # else: 
+        #     boundary_test = False
+
+        return centroid_test #and boundary_test)
+
+    def labelBlocks(self, src_img, block_list):
+        """ take a list of block objects and mark the source image with the block positions """
+
+        block_num = 1
+
+        for block in block_list:
+
+            cx, cy      = block.centroid
+            x, y        = block.pixel_o
+            width       = block.pixel_dim.get('width')
+            height      = block.pixel_dim.get('height')
+
+            cv.circle(src_img, (int(cx), int(cy)), 3, (0, 175, 0), -1)
+            cv.rectangle(src_img, (x, y), (x + width, y + height), (0, 175, 0), 3)
+            # cv.putText(src_img, str(block_num), (int(cx),int(cy)), cv.FONT_HERSHEY_SIMPLEX, 1,(0,255,0), 1, cv.LINE_AA)
+            
+            for metal in block.metal_blobs:            
+                cv.rectangle(src_img, metal.get('p_min'), metal.get('p_max'),  (0, 0, 255), 3)
+            
+            block_num += 1
+
+            # use in the future for block tracker
+            # comp_mask = (label_matrix == ix).astype("uint8") * 255
+        return src_img
+
+
+
+
+    def detectBlocks(self, src_img):
+
+        # apply color filter to get block mask and then inverse to get metal mask
+        block_mask  = self.filterColor(img_bgr=src_img, filter=self.block_filter_HSV)
+        metal_mask  = cv.bitwise_not(block_mask)
+
+        # open both masks with different structuring elements
+        opened_block_mask   = self.compoundOpenImage(src_img=block_mask, param_dict=self.block_open_param)
+        opened_metal_mask   = self.compoundOpenImage(src_img=metal_mask, param_dict=self.metal_open_param)  
+
+        # get connected components within masks
+        block_comps = self.getConnectedComponents(img_binary=opened_block_mask, connectivity=8)  
+        metal_comps = self.getConnectedComponents(img_binary=opened_metal_mask, connectivity=8) 
+        
+        # filter components and retrieve inlier labels
+        block_label_list = self.filterComponents(comp_tuple=block_comps, threshold=self.block_thresh)
+        metal_label_list = self.filterComponents(comp_tuple=metal_comps, threshold=self.metal_thresh)
+
+        # make blue block and metal associations
+        block_obj_list = self.matchComponents(comp_p=block_comps, inlier_ix_p=block_label_list, \
+                                                comp_s=metal_comps, inlier_ix_s=metal_label_list)
+            
+        return block_obj_list
+
+
+
+
+    def filterColor(self, img_bgr, filter):
+        """
+        Find indices of image within range of lower and upper bound in HSV color range.
+        @param img_bgr  - BGR image 
+        @param filter   - lower and upper bound of HSV range as a dict
+        @return: binary mask describing inbound indices """
+        lower = filter.get('lower') 
+        upper = filter.get('upper')
+
+        return cv.inRange(cv.cvtColor(img_bgr, cv.COLOR_BGR2HSV), lower, upper)
 
 
     def applyErosion(self, kernal_size, src, shape):
@@ -115,65 +282,16 @@ class ImageProcessor:
 
         return cv.dilate(src, element)
 
+    def compoundOpenImage(self, src_img, param_dict):
 
-    def compoundOpenImage(self, src_img):
+        # extract kernal scaler from open parameter dictionary
+        erosion_kernal  = param_dict.get('erosion')
+        dilation_kernal = param_dict.get('dilation')
 
-        img_erosion     = self.applyErosion(4, src_img, "cross")
-        opened_img      = self.applyDilation(3, img_erosion, "rectangle")
+        img_erosion     = self.applyErosion(erosion_kernal, src_img, "cross")
+        opened_img      = self.applyDilation(dilation_kernal, img_erosion, "rectangle")
+        
         return opened_img
-
-    """ tracking/detection functions """
-
-    def trackBlockTransport(self, src_img):
-
-        lower_mask = self.filterColor(src_img, self.block_filter_HSV[0], self.block_filter_HSV[1])
-        upper_mask = self.filterColor(src_img, self.electromagnet_filter_HSV[0], self.electromagnet_filter_HSV[1])
-        connection_mask = lower_mask + upper_mask 
-
-        opened_connection_mask = self.compoundOpenImage(connection_mask)
-
-        return opened_connection_mask
-
-
-
-    def detectBlocks(self, src_img):
-
-        ret_img = src_img.copy()
-
-        block_mask = self.filterColor(src_img, self.block_filter_HSV[0], self.block_filter_HSV[1])
-        opened_block_mask = self.compoundOpenImage(block_mask)
-
-        comp_list = self.getConnectedComponents(opened_block_mask, connectivity=8)
-        filtered_comp_list, label_matrix = self.filterComponents(comp_list, self.block_thresh)
-
-        for c in filtered_comp_list:
-
-            (x,y)       = c.get('xy')
-            (w,h)       = c.get('wh')
-            (cX, cY)    = c.get('centroid')
-            ix          = c.get('label_id')
-            print("x,y: %f, %f" % (x,y))
-            print("cX,cY: %f, %f" % (cX,cY))
-            print("w,h: %f, %f" % (w,h))
-
-            component_mask = (label_matrix == ix).astype("uint8") * 255
-            cv.circle(ret_img, (int(cX), int(cY)), 4, (0, 0, 255), -1)
-            cv.rectangle(ret_img, (x, y), (x + w, y + h), (0, 255, 0), 3)
-        # bounding_rect = cv.rectangle(src_img, (x, y), (x + w, y + h), (0, 255, 0), 3)
-
-        return ret_img
-
-
-    def filterColor(self, img_bgr, lower, upper):
-        """
-        Find indices of image within range of lower and upper bound in HSV color range.
-        @param img_bgr - BGR image 
-        @param lower - lower bound of HSV range
-        @param upper - upper bound of HSV range
-        @return: binary mask describing inbound indices """
-
-        return cv.inRange(cv.cvtColor(img_bgr, cv.COLOR_BGR2HSV), lower, upper)
-
 
     def displayImg(self, window_name, img, save_as):
         """ @param title    - name given to image in cv window
@@ -189,7 +307,53 @@ class ImageProcessor:
         if key==ord("s"):
             cv.imwrite(save_as, img)    
         
-        # cv.destroyAllWindows()
+
+    def viewComponents(self,  src_img, components, inlier_ix, verbose):
+
+        (label_count, label_matrix, stats, centroids) = components
+
+        if len(inlier_ix) == 0:
+            iter = np.arange(0, label_count, 1)
+        else:
+            iter = inlier_ix
+
+        for ix in iter:
+
+            w, h    = stats[ix, cv.CC_STAT_WIDTH], stats[ix, cv.CC_STAT_HEIGHT]
+            x, y    = stats[ix, cv.CC_STAT_LEFT], stats[ix, cv.CC_STAT_TOP]
+            cx, cy  = centroids[ix]
+
+            if verbose:
+                print("\n\nLABEL INDEX: %d" % ix)
+                print("width, height, area: %f, %f, %f"  % (w, h, stats[ix, cv.CC_STAT_AREA]))
+                print("x, y, centroid: %f, %f, (%f, %f)" % (x, y, cx, cy))
+
+            comp_mask = (label_matrix == ix).astype("uint8") * 255
+            cv.circle(src_img, (int(cx), int(cy)), 4, (0, 0, 255), -1)
+            cv.rectangle(src_img, (x, y), (x + w, y + h), (0, 255, 0), 3)
+            cv.putText(src_img, str(ix), (int(cx),int(cy)), cv.FONT_HERSHEY_SIMPLEX, 1,(255,0,0), 2, cv.LINE_AA)
+            
+            self.displayImg("source image with bounded labels", src_img, 'img')
+            self.displayImg("component mask", comp_mask, 'img')
+        
+        cv.destroyAllWindows()
+
+
+    def drawDetectionWindow(self, src_img):
+        
+        labeled_img = src_img.copy()
+        min_1 = self.pix_grid.scanning_border.get('start_line_1')
+        max_1 = self.pix_grid.scanning_border.get('end_line_1')
+        min_2 = self.pix_grid.scanning_border.get('start_line_2')
+        max_2 = self.pix_grid.scanning_border.get('end_line_2')
+        
+        # Draw a diagonal blue line with thickness of 5 px
+        cv.line(labeled_img, min_1, max_1, (0,255,255), 1)
+        cv.line(labeled_img, min_2, max_2, (0,255,255), 1)
+
+        return labeled_img
+
+   
 
     def displayImgProperties(self, img):
         print("Image Properties:")
@@ -203,13 +367,6 @@ class ImageProcessor:
     def convert_bgr2grayscale(self, img_bgr):
         return cv.cvtColor(img_bgr, cv.COLOR_BGR2GRAY)
 
-
-    ######## UNUSED ######## 
-
-
-    def findCorner(self, img_gray):
-        gray = np.float32(img_gray)
-        return cv.cornerHarris(gray,2,3,0.04)
 
 
     def applyThreshold(self, img_gray, thresh_type):

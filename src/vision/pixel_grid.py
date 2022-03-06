@@ -18,28 +18,38 @@ class PixelGrid:
         self.min_row            = (self.max_row//resolution)
         self.min_col            = (self.max_col//resolution)
         
-        self.grid_resolution        = resolution
-        # self.grid                   = self.initGrid()
+        self.grid_resolution    = resolution
+        # self.grid             = self.initGrid()
 
 
         """ center column window """
-        self.grid_center            = ((self.max_row-1)//2, self.max_col//2)    # pixel coordinates of grid center
-        self.column_window_delta    = 10                                        # expand column in both directions from center pixel
 
-        self.center_column_window   = (self.grid_center[1] - self.column_window_delta, \
-                                        self.grid_center[1] + self.column_window_delta)  
+        # centroid using column-row space as x-y space
+        self.centroid           = (int(self.max_col/2), int(self.max_row/2))
         
+        # build scanning window using grid centroid-x with +/- offset
+        self.dx                 = 50
+        self.window_base_x      = self.centroid[0] - 25
+        self.scanning_border = {'start_line_1' : (self.window_base_x - self.dx, 0), \
+                                    'end_line_1' : (self.window_base_x - self.dx, self.max_row - 1), \
+                                        'start_line_2' : (self.window_base_x + self.dx, 0), \
+                                    'end_line_2':(self.window_base_x+ self.dx, self.max_row - 1)}
+
+        # self.grid_center            = ((self.max_row-1)//2, self.max_col//2)    # pixel coordinates of grid center
+        # self.column_window_delta    = 10                                        # expand column in both directions from center pixel
+
+        # self.center_column_window   = (self.grid_center[1] - self.column_window_delta, \
+        #                                 self.grid_center[1] + self.column_window_delta)  
+        
+
         # pixel reresenting half way in column space and max in row space
-        self.base_pixel = ((self.max_row - 1), self.max_col // 2)
+        # self.base_pixel = ((self.max_row - 1), self.max_col // 2)
 
-        """ kernal """
-        self.kernal                 = np.array([])
-
-        if DEBUG:   
-            print("pixel grid dim: ", dim)
-            print("grid_center", self.grid_center)
-            print("base_pixel", self.base_pixel)
-            print("center_column_window: ", self.center_column_window)
+        # if DEBUG:   
+        #     print("pixel grid dim: ", dim)
+        #     print("grid_center", self.grid_center)
+        #     print("base_pixel", self.base_pixel)
+        #     print("center_column_window: ", self.center_column_window)
 
 
 
