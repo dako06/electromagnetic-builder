@@ -33,7 +33,7 @@ class VisionActionServer(object):
         self.vel_pub            = rospy.Publisher("cmd_vel", Twist, queue_size=10)
         self.rate               = rospy.Rate(10)
         self.lin_vel_ref        = 0.17
-        self.scan_vel_ref       = 0.1
+        self.scan_vel_ref       = 0.08
 
         # odometry
         self.pose               = Pose2D()
@@ -98,26 +98,21 @@ class VisionActionServer(object):
             
             is_img, img = self.img_buffer.popImg()
 
-            # skip if image is not available
+            # halt scan if image is not available
             if not is_img:
-                rospy.loginfo('image is invalid')
+                
+                rospy.loginfo('Image unavailable, temporarily halting scan')
+                self.vel.angular.z = 0
+                self.vel_pub.publish(self.vel)
+                self.rate.sleep()
                 continue
- 
-            # apply color filter to image
-            mask = self.img_pro.filterColor(img, filter[0], filter[1])                   
-            
-            # apply compound open to image to remove outliers
-            opened_mask = self.img_pro.compoundOpenImage(mask)                                  
-            
-            # get connected components
-            comp = self.img_pro.getConnectedComponents(opened_mask, connectivity=8)      
-            
-            # filter outlier components
-            comp_list, label_matrix = self.img_pro.filterComponents(comp, self.img_pro.block_thresh)  
 
+            # find blocks in field of view
+            block_list  = self.img_pro.detectBlocks(src_img=img)
+            
             # find nearest connected component to base pixel
-            obj_position, nearest_comp  = self.pix_grid.findNearestObject(comp_list) 
-
+            nearest_block, pixel_vector, obj_position = self.img_pro.getBlockTarget(block_list) 
+ 
             print("obj position:", obj_position)
             # set angular scan velocity direction
             if obj_position == "right": 

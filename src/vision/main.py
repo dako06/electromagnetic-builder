@@ -230,9 +230,20 @@ if TEST == 4:
             print('%d labels took %f s to process' % (len(block_list), (tf-to)))
 
             labeled_img = img_pro.labelBlocks(src_img=img, block_list=block_list)
-
             window_img = img_pro.drawDetectionWindow(labeled_img)            
-            img_pro.displayImg("labeled image with window", window_img, 'img')      
+            
+            nearest_block, pixel_vector, obj_position = img_pro.getBlockTarget(block_list) 
+            
+            if pixel_vector[0] == 0 and pixel_vector[1] == 0:
+                print("no pixel vector returned")
+            else:  
+                p1 = img_pro.pix_grid.pixel_anchor
+                cv.line(window_img, p1, pixel_vector, (0,255,255), 1)
+
+
+            img_pro.displayImg("labeled image with window", window_img, 'img')
+
+
 
 
             # # filtered_list = inverse_filtered

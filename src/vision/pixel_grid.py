@@ -13,6 +13,7 @@ class PixelGrid:
 
         """ pixel grid dimensions """
 
+        # take in max row and column  
         self.max_row            = dim[0]
         self.max_col            = dim[1]
         self.min_row            = (self.max_row//resolution)
@@ -30,10 +31,17 @@ class PixelGrid:
         # build scanning window using grid centroid-x with +/- offset
         self.dx                 = 50
         self.window_base_x      = self.centroid[0] - 25
-        self.scanning_border = {'start_line_1' : (self.window_base_x - self.dx, 0), \
-                                    'end_line_1' : (self.window_base_x - self.dx, self.max_row - 1), \
-                                        'start_line_2' : (self.window_base_x + self.dx, 0), \
-                                    'end_line_2':(self.window_base_x+ self.dx, self.max_row - 1)}
+        self.winow_max_x        = self.window_base_x + self.dx
+        self.winow_min_x        = self.window_base_x - self.dx
+
+        self.scanning_border = {'start_line_1' : (self.winow_min_x, 0), \
+                                    'end_line_1' : (self.winow_min_x, self.max_row - 1), \
+                                        'start_line_2' : (self.winow_max_x, 0), \
+                                    'end_line_2':(self.winow_max_x, self.max_row - 1)}
+
+        # pixel used to make nearness measurements,  max_x/2, max_y
+        self.pixel_anchor           = (int(self.max_col // 2), self.max_row)
+        self.pixel_anchor_euclidean = self.euclideanTransform(self.pixel_anchor)
 
         # self.grid_center            = ((self.max_row-1)//2, self.max_col//2)    # pixel coordinates of grid center
         # self.column_window_delta    = 10                                        # expand column in both directions from center pixel
@@ -41,9 +49,6 @@ class PixelGrid:
         # self.center_column_window   = (self.grid_center[1] - self.column_window_delta, \
         #                                 self.grid_center[1] + self.column_window_delta)  
         
-
-        # pixel reresenting half way in column space and max in row space
-        # self.base_pixel = ((self.max_row - 1), self.max_col // 2)
 
         # if DEBUG:   
         #     print("pixel grid dim: ", dim)
@@ -115,19 +120,27 @@ class PixelGrid:
      
         
 
-    def pixelDistanceHeuristic(self, pixel_xy):
-        """ @param pixel_xy: 2-tuple containing x which represents coordinate along column space
-                                and y which represents coordinate along row space 
+    def pixelDistanceHeuristic(self, pixel):
+        """ @param pixel: 2-tuple containing x which represents coordinate along column space
+                            and y which represents coordinate along row space 
             @note confirm proper arithmetic operation given that row space is typically first matrix index
                     and y is typically second element in euclidean coordinates """
-        dp          = (pixel_xy[1] - self.base_pixel[0], pixel_xy[0] - self.base_pixel[1])
-        pixel_dist  = sqrt(dp[0]**2 + dp[1]**2)
-        return pixel_dist
+
+        # use pixel anchor as initial coordinate
+        xo, yo      = self.pixel_anchor_euclidean
+        xf, yf      = self.euclideanTransform(pixel) 
+        # pixel_delta = np.linalg.norm(x=[xf - xo, yf - yo], ord=2)
+        # pixel_dist  = sqrt(dp[0]**2 + dp[1]**2)
+        return np.linalg.norm(x=[xf - xo, yf - yo], ord=2)
 
             
-
-        
-
+    def euclideanTransform(self, p):
+        """ @param p 2-tuple containing x and y coordinates in pixel space (x-column, y-row) 
+            @note transformation inverts the axis then applies offset equal to the pixel anchor 
+                for the convenience of a right handed frame where +x is to the left and +y is up """ 
+        xp, yp = p
+        xo, yo = self.pixel_anchor
+        return ((-1* xp) + xo, (-1 * yp) + yo)
         
 
 

@@ -1,7 +1,8 @@
+#!/usr/bin/env python3
 
-class Block():
+class Block:
 
-    def __init__(self, width, height, area, centroid, p_o) -> None:
+    def __init__(self, width, height, area, centroid, p_o):
 
         self.pixel_dim      = {'width':width, 'height':height, 'area':area} 
         self.centroid       = centroid

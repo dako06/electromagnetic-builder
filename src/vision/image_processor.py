@@ -2,9 +2,9 @@
 
 import cv2 as cv
 import numpy as np
-from block import Block
 
-from pixel_grid import PixelGrid
+from vision.building_block import Block 
+from vision.pixel_grid import PixelGrid
 
 class ImageProcessor:
 
@@ -187,34 +187,6 @@ class ImageProcessor:
 
         return centroid_test #and boundary_test)
 
-    def labelBlocks(self, src_img, block_list):
-        """ take a list of block objects and mark the source image with the block positions """
-
-        block_num = 1
-
-        for block in block_list:
-
-            cx, cy      = block.centroid
-            x, y        = block.pixel_o
-            width       = block.pixel_dim.get('width')
-            height      = block.pixel_dim.get('height')
-
-            cv.circle(src_img, (int(cx), int(cy)), 3, (0, 175, 0), -1)
-            cv.rectangle(src_img, (x, y), (x + width, y + height), (0, 175, 0), 3)
-            # cv.putText(src_img, str(block_num), (int(cx),int(cy)), cv.FONT_HERSHEY_SIMPLEX, 1,(0,255,0), 1, cv.LINE_AA)
-            
-            for metal in block.metal_blobs:            
-                cv.rectangle(src_img, metal.get('p_min'), metal.get('p_max'),  (0, 0, 255), 3)
-            
-            block_num += 1
-
-            # use in the future for block tracker
-            # comp_mask = (label_matrix == ix).astype("uint8") * 255
-        return src_img
-
-
-
-
     def detectBlocks(self, src_img):
 
         # apply color filter to get block mask and then inverse to get metal mask
@@ -239,8 +211,60 @@ class ImageProcessor:
             
         return block_obj_list
 
+    def getBlockTarget(self, block_list):
 
+        if len(block_list) == 0:
+            return [], (0,0), "unknown"
 
+        # sort blocks based on nearness to camera
+        block_list.sort(key = lambda x: self.pix_grid.pixelDistanceHeuristic(x.centroid))
+        
+        nearest_block   = block_list.pop(0)
+        cx, cy          = nearest_block.centroid
+
+        xo, yo = self.pix_grid.pixel_anchor
+        pixel_vector = (int(cx - xo), int(yo - cy))
+        
+        if cx > self.pix_grid.winow_min_x and cx < self.pix_grid.winow_max_x:
+            return [nearest_block], pixel_vector, "center"
+        
+        else:
+            # determine rotation direction required to center object with robots perspective 
+            if pixel_vector[0] > 0:
+                grid_position = "right"
+
+            elif pixel_vector[0] < 0:
+                grid_position = "left"
+            else:
+                print("Error: Invalid return for rotation direction")
+                grid_position = "unknown"
+        
+            return [nearest_block], pixel_vector, "grid_position"
+
+    def labelBlocks(self, src_img, block_list):
+        """ take a list of block objects and mark the source image with the block positions """
+
+        block_num = 1
+
+        for block in block_list:
+
+            cx, cy      = block.centroid
+            x, y        = block.pixel_o
+            width       = block.pixel_dim.get('width')
+            height      = block.pixel_dim.get('height')
+
+            cv.circle(src_img, (int(cx), int(cy)), 3, (0, 175, 0), -1)
+            cv.rectangle(src_img, (x, y), (x + width, y + height), (0, 175, 0), 3)
+            # cv.putText(src_img, str(block_num), (int(cx),int(cy)), cv.FONT_HERSHEY_SIMPLEX, 1,(0,255,0), 1, cv.LINE_AA)
+            
+            for metal in block.metal_blobs:            
+                cv.rectangle(src_img, metal.get('p_min'), metal.get('p_max'),  (0, 0, 255), 3)
+            
+            block_num += 1
+
+            # use in the future for block tracker
+            # comp_mask = (label_matrix == ix).astype("uint8") * 255
+        return src_img
 
     def filterColor(self, img_bgr, filter):
         """

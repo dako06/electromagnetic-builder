@@ -47,21 +47,33 @@ class GUI:
         
         # process image  
         if state == "block_detection":
-            img = self.img_pro.detectBlocks(cv_image)
+
+            block_list  = self.img_pro.detectBlocks(src_img=cv_image)
+            block_img   = self.img_pro.labelBlocks(src_img=cv_image, block_list=block_list)
+            disp_img    = self.img_pro.drawDetectionWindow(block_img)
+                    
+            nearest_block, pixel_vector, obj_position = self.img_pro.getBlockTarget(block_list) 
+            
+            if pixel_vector[0] == 0 and pixel_vector[1] == 0:
+                print("no pixel vector returned")
+            else:  
+                p1 = self.img_pro.pix_grid.pixel_anchor
+                cv.line(disp_img, p1, pixel_vector, (255,0,255), 1)
+
 
         elif state == "track_block_transport":
-            img = self.img_pro.trackBlockTransport(cv_image)
+            disp_img = self.img_pro.trackBlockTransport(cv_image)
         
         elif state == "non_action":
-            img = cv_image
+            disp_img = cv_image
 
-        self.img_pro.displayImg("test_window", cv_image, "label_test_9a.png")
+        # self.img_pro.displayImg("test_window", cv_image, "label_test_9a.png")
         # self.img_pro.displayImg("test_window", cv_image, "label_test_9b.png")
 
         # refresh window
-        # cv.imshow(self.gui_name, img)
-        # cv.waitKey(self.refresh)
-        # self.rate.sleep()     
+        cv.imshow(self.gui_name, disp_img)
+        cv.waitKey(self.refresh)
+        self.rate.sleep()     
 
 
     def gui_state_callback(self, msg):
