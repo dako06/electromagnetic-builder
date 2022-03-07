@@ -8,7 +8,7 @@ Servo End_joint;
 #define END_ZERO_POSITION_PULSE_WIDTH 1400
 #define END_MAX_PULSE_WIDTH 2300
 // Parameters for setting the velocity of the end servo
-  // Current setting: 16 degrees per second (same as base servo)
+  // Current setting: 2.86 degrees per second (same as base servo)
 #define END_WIDTH_INCREMENT 5
 #define END_DELAY_US 90000
 int end_curr_position;

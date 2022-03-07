@@ -215,7 +215,7 @@ void LA_Update_Pulse_Width() {
   if (vel_update_counter % 100 == 0) {
     float vel_to_match = BASE_DEFAULT_VEL * (L0 + LA_Pos_mm()) * base_angle_tan;
     unsigned int pulse_width_to_match = LA_Vel_To_Pulse_Width(vel_to_match);
-    //LA_Send_Pulse_Width(max(pulse_width_to_match, LA_Get_Max_Achievable_Pulse_Width());
+    //LA_Send_Goal_Velocity(max(pulse_width_to_match, LA_Get_Max_Achievable_Pulse_Width());
   }
 }
 
@@ -247,7 +247,7 @@ unsigned int LA_Vel_To_Pulse_Width(float vel_in_mm_per_sec) {
 //   }
 // }
 
-// void LA_Send_Pulse_Width(unsigned int pulse_width) {
+// void LA_Send_Goal_Velocity(unsigned int pulse_width) {
 //   LA_CNTRL_SERIAL.write(SET_GOAL_VELOCITY_MSG);
 //   byte goal_vel_lower_7 = pulse_width & 0x7F;
 //   byte goal_vel_upper_7 = (pulse_width & 0x3F80) >> 7;
