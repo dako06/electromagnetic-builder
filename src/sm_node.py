@@ -30,7 +30,7 @@ class initializeBuilder(smach.State):
     def execute(self, userdata):
 
         # send first gui state message
-        foreman.updateGUI("non_action")
+        foreman.updateGUI("block_detection")
 
         # read in and process raw blueprint file
         fpath_blueprint_xlsx = '~/catkin_ws/src/electromagnetic_builder/blueprint_raw.xlsx'
@@ -61,7 +61,7 @@ class evaluateBuildStatus(smach.State):
     def execute(self, userdata):
 
         # update gui status
-        foreman.updateGUI("non_action")
+        foreman.updateGUI("block_detection")
 
         block_total = foreman.getBlockTotal() 
 
@@ -82,20 +82,15 @@ class evaluateBuildStatus(smach.State):
 
 
 # class navigateToZone(smach.State):
-
 #     def __init__(self):
 #         # intialize state class, outcomes and userdata keys passed during transitions   
 #         smach.State.__init__(self, outcomes=['at_block_storage', 'at_platform', 'navigation_failure'],
 #                                     input_keys=['execute_request'])
-
-
 #     def execute(self, userdata):
 
 #         # validate input key
 #         if userdata.execute_request == "platform" or userdata.execute_request == "block_storage":
-
 #             print("Navigating to %s." % userdata.execute_request)
-
 #             (p_xo, p_yo) =  foreman.grid.getCurrent()                       # get start point 
 #             (p_xf, p_yf) =  foreman.grid.getGoal(userdata.execute_request)  # get goal point  
 
@@ -106,7 +101,6 @@ class evaluateBuildStatus(smach.State):
 #             if (len(path) == 0):
 #                 rospy.loginfo('A* did not succesfully find waypoints.\n')
 #                 result = False
-
 #             else:             
 #                 rospy.loginfo('Next path is ready.\n')
 #                 foreman.executeTrajectory(path)   # attempt navigation
@@ -115,13 +109,10 @@ class evaluateBuildStatus(smach.State):
 #                     return 'at_platform'
 
 #                 elif userdata.execute_request == "block_storage":        
-#                     return 'at_block_storage'
-                       
-            
+#                     return 'at_block_storage'            
 #         else:
 #             print("Error: Invalid value assigned to state machine navigation key: %s\nExiting." % userdata.execute_request)
 #             return 'navigation_failure'
-
 
 class positionForExtraction(smach.State):
 
@@ -141,7 +132,7 @@ class positionForExtraction(smach.State):
         foreman.updateGUI("block_detection")
 
         # find candidate blocks in the field 
-        block_centered = foreman.requestVisionAction('locate_block')   
+        block_centered = foreman.requestVisionAction('center_candidate_block')   
         
         # return state machine transition
         if block_centered:
@@ -172,6 +163,7 @@ class extractBlock(smach.State):
         # set coordinate estimate for extraction 
         # block_coordinate = foreman.setBlockCoordinate() # update current associated x,y coordinate based on block index            
 
+        foreman.updateGUI("track_block_transport")
 
         # call action server to execute extraction at estimated block position
         block_extracted = foreman.requestBlockExtraction()

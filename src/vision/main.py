@@ -15,6 +15,7 @@ from image_processor import ImageProcessor
 from image_buffer import ImageBuffer 
 from pixel_grid import PixelGrid
 
+from building_block import Block
 
 main_window = 'Main Window'
 cv.namedWindow(main_window, cv.WINDOW_AUTOSIZE)
@@ -185,18 +186,10 @@ if TEST == 4:
             if img is None:
                 print("path: ", path)
                 sys.exit("Could not read the image.") # exit if issue opening image
-
-            img_pro.displayImg(main_window, img, 'img')      
-
-            # copies used for processing visualization
-            img_copy_1 = img.copy()
-            img_copy_2 = img.copy()
-            img_copy_3 = img.copy()
-            img_copy_4 = img.copy()
-            img_copy_5 = img.copy()
-
-            # start time to measure analysis
             
+            # img_pro.displayImgProperties(img)
+            # img_pro.displayImg(main_window, img, 'img')      
+       
 
             # # apply color filter  
             # block_mask = img_pro.filterColor(img_copy_1, img_pro.block_filter_HSV)               
@@ -225,23 +218,44 @@ if TEST == 4:
             # # img_pro.viewComponents(img_copy_2, metal_comps, metal_inliers, verbose=True)
 
             to = time.time() 
-            block_list = img_pro.detectBlocks(img)
+            block_list = img_pro.detectBlocks(src_img=img)
+            sorted_blocks, obj_position = img_pro.getBlockTarget(block_list=block_list) 
             tf = time.time()
             print('%d labels took %f s to process' % (len(block_list), (tf-to)))
 
             labeled_img = img_pro.labelBlocks(src_img=img, block_list=block_list)
-            window_img = img_pro.drawDetectionWindow(labeled_img)            
+            window_img  = img_pro.drawDetectionWindow(src_img=labeled_img)            
+
+            if obj_position != "unknown" and len(block_list) != 0:
+
+                cx, cy = sorted_blocks[0].centroid
+                xf, yf = img_pro.pix_grid.window_anchor
             
-            nearest_block, pixel_vector, obj_position = img_pro.getBlockTarget(block_list) 
-            
-            if pixel_vector[0] == 0 and pixel_vector[1] == 0:
-                print("no pixel vector returned")
+                cv.arrowedLine(window_img, (xf,yf), (int(cx), int(cy)), (0,255,0), 1)
+                img_pro.displayImg(main_window, window_img, 'img')
+
             else:  
-                p1 = img_pro.pix_grid.pixel_anchor
-                cv.line(window_img, p1, pixel_vector, (0,255,255), 1)
+                print("nearest block not found")
+                img_pro.displayImg(main_window, window_img, 'img')
 
 
-            img_pro.displayImg("labeled image with window", window_img, 'img')
+            if len(block_list) != 0:
+                
+                # test_block = Block(width==)
+                # w block_list[0].pixel_dim.get('width')
+                # test_block.pixel_o = test_block.pixel_o[0] + 50, test_block.pixel_o[1] + 50
+                # test_block.centroid = test_block.centroid[0] + 50, test_block.centroid[1] + 50
+                # test_block.updateFeatureArray()
+
+                # c_block = img_pro.getBlockCorrespondence(block_list, test_block, -1)
+
+                print("correspondence block:" )
+                print("x,y: %f, %f" % c_block.pixel_o)
+                print("centroid: %f, %f" % c_block.centroid)
+
+                print("target block:" )
+                print("x,y: %f, %f" % test_block.pixel_o)
+                print("centroid: %f, %f" % test_block.centroid)
 
 
 

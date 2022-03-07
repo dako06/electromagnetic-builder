@@ -37,7 +37,7 @@ class Foreman:
 
         # publisher for updating GUI with current state
         self.gui_update_pub = rospy.Publisher("gui_state", GUI_State, queue_size=10)
-        self.gui_state      = GUI_State(state="non_action")
+        self.gui_state      = GUI_State(state="block_detection")
 
         # rpr maniupulator action client
         self.rpr_client = SimpleActionClient('rpr_manip_action', RPRManipulatorAction)
@@ -114,8 +114,8 @@ class Foreman:
         # estimated x,y,z coordinates of current block to place
         self.block_coordinates = (0,0,0)  
 
-
-        self.cv_commands = ['locate_block']
+        """ computer vision entities """
+        self.cv_commands = ['center_candidate_block']
 
 
         self.DEBUG = True   # set for verbosity during initialization
@@ -403,9 +403,6 @@ class Foreman:
         self.vel_pub.publish(self.vel)
         self.rate.sleep()
 
-    def alignWithBlock(self, T):
-        """ @param T an orientation to align with w.r.t. to some distance offset """ 
-        pass
 
 
     def getBlockOrientation(self): pass
@@ -413,11 +410,11 @@ class Foreman:
 
     def updateGUI(self, state_update):
         
-        self.gui_state.state = state_update
-
-        for i in range(10):
-            self.gui_update_pub.publish(self.gui_state)
-            self.rate.sleep()
+        self.gui_state.state            = state_update
+        self.gui_state.target_acquired  = False
+        self.gui_update_pub.publish(self.gui_state)
+        # for i in range(10):
+        #     self.rate.sleep()
 
     """ ROS callback functions """
 
