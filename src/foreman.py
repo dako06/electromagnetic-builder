@@ -74,9 +74,11 @@ class Foreman:
         self.BUILD_DIM = (4, 1)
 
         # known size of block stored in meters (length is along x-axis)
-        self.BLOCK_LENGTH   = 1.5 * self.INCH2METER
-        self.BLOCK_WIDTH    = 1.5 * self.INCH2METER
-        self.BLOCK_HEIGHT   = 1.5 * self.INCH2METER
+        self.BLOCK_LENGTH       = 1.6 * self.INCH2METER
+        self.BLOCK_WIDTH        = 1.5 * self.INCH2METER
+        
+        self.BLOCK_HEIGHT_MAX   = 2.0 * self.INCH2METER
+        self.PLATFORM_HEIGHT    = 0.0
 
         # rpr manipulator offsets
         self.rpr_z_offset   = 141                       # distance of rpr z origin above ground [mm]
@@ -254,7 +256,7 @@ class Foreman:
         
         manip_goal.x = (self.laser_distance_x * 1000.0) + self.rpr_x_offset + (self.BLOCK_LENGTH/2)*1000.0
         manip_goal.y = 0.0                          
-        manip_goal.z = (self.BLOCK_HEIGHT * 1000.0) - self.rpr_z_offset
+        manip_goal.z = (self.BLOCK_HEIGHT_MAX * 1000.0) - self.rpr_z_offset
 
 
         # send goal to action server and wait for completion
