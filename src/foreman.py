@@ -56,7 +56,7 @@ class Foreman:
 
         # LDS scan processer items 
         self.processed_scan_sub = rospy.Subscriber("scan_distance", Float32, self.scan_callback)
-        self.forward_distance   = np.NaN
+        self.laser_distance_x   = np.NaN
 
    
         """ class members """
@@ -248,11 +248,14 @@ class Foreman:
         # wait for server to prepare for goals
         self.rpr_client.wait_for_server()    
 
+        manip_goal = RPRManipulatorGoal() 
+
         # preprocess goal for rpr constraints (adjust for axis offset and convert to mm)
-        manip_goal = RPRManipulatorGoal()        
-        manip_goal.x = self.forward_distance * 1000.0 - self.rpr_x_offset 
+        
+        manip_goal.x = (self.laser_distance_x * 1000.0) + self.rpr_x_offset + (self.BLOCK_LENGTH/2)*1000.0
         manip_goal.y = 0.0                          
         manip_goal.z = (self.BLOCK_HEIGHT * 1000.0) - self.rpr_z_offset
+
 
         # send goal to action server and wait for completion
         self.rpr_client.send_goal(manip_goal)  
@@ -428,7 +431,7 @@ class Foreman:
         self.pose.y = msg.pose.pose.position.y
 
     def scan_callback(self, msg):
-        self.forward_distance = msg.data
+        self.laser_distance_x = msg.data
 
 
 """ main function for testing only """
