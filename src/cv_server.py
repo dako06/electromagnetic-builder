@@ -16,8 +16,8 @@ import numpy as np
 from math import pi
 from cv_bridge import CvBridge, CvBridgeError
 
-from utilities import controller, nav_utilities
-from vision import image_buffer, image_processor, pixel_grid
+from utilities import controller
+from vision import image_buffer, image_processor
 
 class VisionActionServer(object):
     
@@ -83,17 +83,22 @@ class VisionActionServer(object):
             # sets the target block and the specifications to meet 
             if self.setTargetBlock():
 
-                cx, cy = self.target_block.centroid
                 rospy.loginfo('%s: Target block acquired. Centroid of target is (%s, %s)'% (self.action_name, int(round(cx)), int(round(cy))))
+                cx, cy = self.target_block.centroid
                 
-                # build geofence and check if target block is already within window
-                min_pt          = self.img_pro.pix_grid.scanning_border.get('start_line_1')
-                max_pt          = self.img_pro.pix_grid.scanning_border.get('end_line_2')
-                pixel_geofence  = {'min_coordinate': min_pt, 'max_coordinate':max_pt}
+                # check that block is not already within window
+                if self.block_trajectory.get('direction') == 0:
+                    
+                    # build geofence and check if target block is already within window
+                    min_pt          = self.img_pro.pix_grid.scanning_border.get('start_line_1')
+                    max_pt          = self.img_pro.pix_grid.scanning_border.get('end_line_2')
+                    pixel_geofence  = {'min_coordinate': min_pt, 'max_coordinate':max_pt}
 
-                if self.img_pro.isBlobInBlob(pixel_geofence, self.target_block.centroid):
-                    rospy.loginfo('%s: Target block is already within extraction window' % self.action_name)
-                    result.execution_status = True
+                    if self.img_pro.isBlobInBlob(pixel_geofence, self.target_block.centroid):
+                        rospy.loginfo('%s: Target block is already within extraction window' % self.action_name)
+                        result.execution_status = True
+                    else:
+                        rospy.loginfo('%s: Direction is 0 but target centroid is not within region.' % self.action_name)
                 
                 else:
                 
@@ -199,12 +204,11 @@ class VisionActionServer(object):
 
         rospy.loginfo('Tracking inverse slope initially set to: %s', str(round(inv_slope,4)))
 
-
         # initialize theta accumulator
         theta_sum, theta_prev, theta_i = 0, 0, 0
 
         # guess used during correspondence, rotating right means -wz and correspondence shifts to the left over time 
-        direction   = self.block_trajectory.get('direction')
+        direction = self.block_trajectory.get('direction')
         
         """ set multiplier for sign of angular rotation 
              -1 rotation towards right of the screen 
@@ -257,7 +261,6 @@ class VisionActionServer(object):
                 rospy.loginfo('Total scan: %s radians', str(round(theta_sum,2)))
 
             
-        
             # keep loop at defined rate
             self.vel_pub.publish(self.vel)
             self.updateGUIMsg("track_target_block")

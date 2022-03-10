@@ -14,8 +14,8 @@ class ImageProcessor:
     def __init__(self) -> None:
 
         # HSV color filters with lower and upper thresholds  
-        self.block_filter_HSV  = {'lower':np.array([100, 90, 20], dtype = "uint8"), \
-                                    'upper':np.array([120, 255, 255],  dtype = "uint8")}
+        self.block_filter_HSV  = {'lower':np.array([105, 110, 20], dtype = "uint8"), \
+                                    'upper':np.array([115, 255, 255],  dtype = "uint8")}
 
 
         self.emag_filter_HSV   = {'lower':np.array([155, 100, 20], dtype = "uint8"), \
@@ -27,14 +27,14 @@ class ImageProcessor:
         """ thresholds for filtering objects in pixel space
                 (element 0 is min and element 1 is max)     """
         # single block 
-        self.block_thresh = {'width':(45,175), 'height':(45,140), 'area':(4000,20000)}
+        self.block_thresh = {'width':(45,175), 'height':(45,180), 'area':(4000,20000)}
+        self.near_block_thresh = {'width':(200,400), 'height':(200,400), 'area':(20000,40000)}
         self.metal_thresh = {'width':(20,50), 'height':(10,50), 'area':(200,2000)}
-        self.emag_block_pixel_area = 40000
-        self.block_open_param = {'erosion':2, 'dilation':3}
-        self.metal_open_param = {'erosion':3, 'dilation':4}
+        self.emag_thresh  = {'width':(50,150), 'height':(30,100), 'area':(2500,4500)}
 
-        # block and electromagnet connection 
-        self.block_emag_thresh = {'width':(50,90), 'height':(50,90), 'area':(2400,3100)}
+        self.emag_param         = {'erosion':4, 'dilation':2}
+        self.block_open_param   = {'erosion':2, 'dilation':3}
+        self.metal_open_param   = {'erosion':3, 'dilation':4}
 
 
     def getConnectedComponents(self, img_binary, connectivity):
@@ -95,11 +95,17 @@ class ImageProcessor:
 
         # build color mask to identify block and emag connection 
 
-        lower_mask      = self.filterColor(src_img, self.block_filter_HSV)
-        upper_mask      = self.filterColor(src_img, self.emag_filter_HSV)
-        connection_mask = lower_mask + upper_mask 
+        emag_mask       = self.filterColor(src_img, self.emag_filter_HSV)
+        block_mask      = self.filterColor(src_img, self.block_filter_HSV)
 
-        opened_connection_mask              = self.compoundOpenImage(src_img=connection_mask, param_dict=self.block_open_param)
+
+        connection_mask = block_mask + emag_mask
+
+        # extract emag and block seperately
+        opened_emag_mask        = self.compoundOpenImage(src_img=emag_mask, param_dict=self.metal_open_param)
+        opened_block_mask       = self.compoundOpenImage(src_img=block_mask, param_dict=self.block_open_param)
+        opened_connection_mask  = self.compoundOpenImage(src_img=connection_mask, param_dict=self.block_open_param)
+
         (label_count, _, stats, centroids)  = self.getConnectedComponents(img_binary=opened_connection_mask, connectivity=8)  
 
         pixel_features = {}
@@ -239,9 +245,9 @@ class ImageProcessor:
         initial_dy = cy - yo
         
         if initial_dx > 0:
-            direction = -1
+            direction = -1      # blob shifts towards left in pixel space
         elif initial_dx < 0:
-            direction = 1
+            direction = 1       # blob shifts towards right in pixel space
         elif initial_dx == 0:
             direction = 0
      
@@ -274,13 +280,31 @@ class ImageProcessor:
         cx, cy = target_block.centroid
         print("\n\ntarget centroid: (%f, %f)" % (cx, cy))
 
-        # features used for correspondence
+        # do nothing if no blocks found
+        if len(block_list) == 0:
+            return False, None
+        
+        elif len(block_list) == 1:
+
+            # if only one block check that target centroid is within pixel space of this block
+            w       = block_list[0].pixel_dim.get('width')
+            h       = block_list[0].pixel_dim.get('height')
+            x, y    = block_list[0].pixel_o
+            pixel_geofence  = {'min_coordinate': (x, y), 'max_coordinate': (x + w, y + h)}
+            
+            if self.isBlobInBlob(pixel_geofence, (cx, cy)):
+                return True, block_list[0]
+            else:
+                return False, None
+         
+
+        # find block which has the least sse
         for block in block_list:
 
             block_ix += 1
-            print("centroid for block at index %d: (%f, %f)" % (block_ix, block.centroid[0], block.centroid[1]))
+            print("Centroid of block at index %d: (%f, %f)" % (block_ix, block.centroid[0], block.centroid[1]))
             
-            dx = block.centroid[0] - target_block.centroid[0]  
+            dx = block.centroid[0] - target_block.centroid[0]
 
             # check if block violates guess
             if (direction == -1 and dx > 0 ) or (direction == 1 and dx < 0):
@@ -288,18 +312,9 @@ class ImageProcessor:
             
             # get the delta for all feature points of the block
             delta = np.subtract(block.feature_array, target_block.feature_array)        
-            # print("target features used:")
-            # print(target_block.feature_array)
-            # print("index %d block features used:" % block_ix)
-            # print(block.feature_array)
-            print("delta of the features for index %d:" % block_ix)
-            print(delta)
             
             # store norms as a list
             cost_array = [np.linalg.norm(d, ord=2, axis=0) for d in delta]
-
-            print("norm of each tuple in delta features array:")
-            print(cost_array)
 
             # add the correspondence values
             corresp_list.append(cost_array)
@@ -312,10 +327,24 @@ class ImageProcessor:
             corresp_ix = np.argmin(corresp_sum, axis=0)
             block_corresp_ix = ix_list[corresp_ix]
 
-            print("block_corresp_ix", block_corresp_ix)            
+            print("Block correspondence index ", block_corresp_ix)            
             return True, block_list.pop(block_corresp_ix)
 
         elif len(corresp_list) == 1:
+
+            # confirm that this block is within space of target block
+            wt       = target_block.pixel_dim.get('width')
+            ht       = target_block.pixel_dim.get('height')
+            xt, yt  = block_list[ix_list[0]].centroid
+
+            cxb, cyb  = block_list[ix_list[0]].centroid
+            pixel_geofence  = {'min_coordinate': (xt, yt), 'max_coordinate': (xt + wt, yt + ht)}
+            
+            if self.isBlobInBlob(pixel_geofence, (cxb, cyb)):
+                return True, block_list[ix_list[0]]
+            else:
+                return False, None
+
             return True, block_list.pop(ix_list[0])
 
         elif len(corresp_list) == 0:
@@ -328,9 +357,6 @@ class ImageProcessor:
         # print("corresp_sum")
         # print(corresp_sum)
        
-
-
-
     def filterColor(self, img_bgr, filter):
         """
         Find indices of image within range of lower and upper bound in HSV color range.
