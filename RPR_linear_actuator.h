@@ -50,6 +50,8 @@ bool LA_Is_Valid_Position(unsigned int pos);
 void LA_Set_Accel_Parameters(float vel_in_mm_per_sec);
 float LA_Pos_mm();
 unsigned int LA_Vel_To_Pulse_Width(float vel_in_mm_per_sec);
+unsigned int LA_Get_Max_Achievable_Pulse_Width();
+void LA_Send_Goal_Velocity(unsigned int pulse_width);
 
 typedef enum {
   DEFAULT_MODE,

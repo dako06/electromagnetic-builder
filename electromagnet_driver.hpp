@@ -2,7 +2,9 @@
 #define ELECTROMAGNET_DRIVER_
 
 
-// #define SOLENOIDPIN 3
+#define SOLENOIDPIN 3
+
+bool solenoid_state;
 
 // class solenoid_Driver {
 
@@ -10,10 +12,11 @@
 //     solenoid_Driver();
 //     ~solenoid_Driver();
     
-//     void initializeSolenoid()
-//     {
-//       pinMode(SOLENOIDPIN, OUTPUT);
-//     }
+    void initializeSolenoid()
+    {
+      pinMode(SOLENOIDPIN, OUTPUT);
+      solenoid_state = false;
+    }
     
 //     void solenoidState()
 //     {

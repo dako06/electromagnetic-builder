@@ -14,20 +14,12 @@ void Init_Base_Servo() {
   base_is_moving = false;
 }
 
+/*  // Old function, replaced below
 void Base_Servo_Move_Callback() {
-  // The base servo position needs to be updated as the base servo arrives at the position that was calculated 
-    // in the previous iteration. When this function is first called, the base servo will be arriving at the position which
-    // was assigned to new_position at the end of the previous iteration, and the current position is updated to reflect this
   static int new_position = 0;
-//  if (new_position != 0) {
-//    base_curr_position = new_position;
-//  }
-
   new_position        = base_curr_position + (base_move_dir * BASE_WIDTH_INCREMENT);
   base_curr_position  = new_position;
-  
-  //if (Base_Is_Valid_Position(new_position)) {
-  
+  if (Base_Is_Valid_Position(new_position)) {
     if (abs(new_position - base_goal_position) <= BASE_WIDTH_INCREMENT) 
     {
       Base_joint.write(new_position);
@@ -38,28 +30,46 @@ void Base_Servo_Move_Callback() {
     {
       Base_joint.write(new_position);
     }
-    //Update_Base_Angle_Tan(new_position);
-  //}
-//  else {
-//    Serial.print("new_position was invalid in Base_Servo_Move_Callback: ");
-//    Serial.println(new_position);
-//    base_is_moving = false;
-//  }
+    Update_Base_Angle_Tan(new_position);
+  }
+ else {
+   base_is_moving = false;
+ }
+}
+*/
+
+void Base_Servo_Move_Callback() {
+  static int new_position = BASE_ZERO_POSITION_PULSE_WIDTH;
+  base_curr_position = new_position;
+  if (abs(base_curr_position - base_goal_position) <= BASE_WIDTH_INCREMENT) {
+    // Close enough to reach goal position in one step
+    Base_joint.writeMicroseconds(base_goal_position);
+    base_curr_position = base_goal_position;
+    base_is_moving = false;
+  }
+  else {
+    new_position = base_curr_position + (base_move_dir * BASE_WIDTH_INCREMENT);
+    if (Base_Is_Valid_Position(new_position)) {
+      Base_joint.writeMicroseconds(new_position);
+      Update_Base_Angle_Tan(new_position);
+    }
+    else { // Reached end of range
+      base_is_moving = false;
+    }
+  }
 }
 
 void Prepare_Base_Servo_Move_Task(int goal_position) 
 {
-
  // checks that 1200 < goal_position < 2100
-// if (goal_position > BASE_MAX_PULSE_WIDTH || goal_position < BASE_MIN_PULSE_WIDTH) {
-//   Serial.println("goal_position was invalid in call to Prepare_Base_Servo_Move_Task");
-// }
-
+  if (goal_position > BASE_MAX_PULSE_WIDTH || goal_position < BASE_MIN_PULSE_WIDTH) {
+    //Serial.println("goal_position was invalid in call to Prepare_Base_Servo_Move_Task");
+    return;
+  }
  base_goal_position = goal_position;
  base_move_dir      = (base_curr_position > base_goal_position) ? -1 : 1; // -1 for CW, 1 for CCW
  base_is_moving     = true;
  base_angle_tan     = tan(Base_PWM_to_Rad(base_curr_position));           // starting value
- 
 }
 
 float Base_PWM_to_Rad(int PWM_us) {
@@ -100,6 +110,7 @@ void Start_LA_Homing() {
 }
 
 void Lin_Act_Move_Callback() {
+  /* // Basic functionality for testing
   if (LA_CNTRL_SERIAL.available()) {
     // Move complete or homing complete signal was received
     if (LA_is_homing) {
@@ -111,7 +122,7 @@ void Lin_Act_Move_Callback() {
     }
     LA_is_moving = false;
   }
-  /*
+  */
   // If homing is in progress, just wait for the HOMING_COMPLETE message
   // Otherwise, read any CURR_POSITION messages received from the Uno
     // Keep only the most recent CURR_POSITION message
@@ -149,7 +160,7 @@ void Lin_Act_Move_Callback() {
       }
     }
   }
-  */
+  
 }
 
 void Prepare_LA_Move_Task(LA_Move_Command LA_cmd) {
@@ -207,7 +218,7 @@ void LA_Update_Pulse_Width() {
  // In block place mode, this function sends the new required pulse width in microseconds to the Uno
   // for it to attempt to match
  // Note that the actual pulse width that is being used at any given time is controlled by the Uno's
-  // program and does nto always match this pulse width
+  // program and does not always match this pulse width
  // In order to cut down on calculations, the velocity to match is only calculated on every 100 executions
    // of this function
   static unsigned long vel_update_counter = 0;
@@ -215,7 +226,7 @@ void LA_Update_Pulse_Width() {
   if (vel_update_counter % 100 == 0) {
     float vel_to_match = BASE_DEFAULT_VEL * (L0 + LA_Pos_mm()) * base_angle_tan;
     unsigned int pulse_width_to_match = LA_Vel_To_Pulse_Width(vel_to_match);
-    //LA_Send_Goal_Velocity(max(pulse_width_to_match, LA_Get_Max_Achievable_Pulse_Width());
+    LA_Send_Goal_Velocity(std::max(pulse_width_to_match, LA_Get_Max_Achievable_Pulse_Width()));
   }
 }
 
@@ -231,29 +242,29 @@ unsigned int LA_Vel_To_Pulse_Width(float vel_in_mm_per_sec) {
  return (1.0/vel_in_mm_per_sec)*5000 + 0.5;
 }
 
-// Using conservative estimates
-// unsigned int LA_Get_Max_Achievable_Pulse_Width() {
-//     // If base angle is within 20 degrees of 0, use 300
-//     // If base angle is within 40 degrees of 0, use 400
-//     // If base angle greater than those, use 625
-//   if (abs(base_curr_position - BASE_ZERO_POSITION_PULSE_WIDTH) <= 200) {
-//     return 300;
-//   }
-//   else if (abs(base_curr_position - BASE_ZERO_POSITION_PULSE_WIDTH) <= 400) {
-//     return 400;
-//   }
-//   else {
-//     return 625;
-//   }
-// }
+//Using conservative estimates
+unsigned int LA_Get_Max_Achievable_Pulse_Width() {
+    // If base angle is within 20 degrees of 0, use 300
+    // If base angle is within 40 degrees of 0, use 400
+    // If base angle greater than those, use 625
+  if (abs(base_curr_position - BASE_ZERO_POSITION_PULSE_WIDTH) <= 200) {
+    return 300;
+  }
+  else if (abs(base_curr_position - BASE_ZERO_POSITION_PULSE_WIDTH) <= 400) {
+    return 400;
+  }
+  else {
+    return 625;
+  }
+}
 
-// void LA_Send_Goal_Velocity(unsigned int pulse_width) {
-//   LA_CNTRL_SERIAL.write(SET_GOAL_VELOCITY_MSG);
-//   byte goal_vel_lower_7 = pulse_width & 0x7F;
-//   byte goal_vel_upper_7 = (pulse_width & 0x3F80) >> 7;
-//   LA_CNTRL_SERIAL.write(goal_vel_lower_7);
-//   LA_CNTRL_SERIAL.write(goal_vel_upper_7);
-// }
+void LA_Send_Goal_Velocity(unsigned int pulse_width) {
+  LA_CNTRL_SERIAL.write(SET_GOAL_VELOCITY_MSG);
+  byte goal_vel_lower_7 = pulse_width & 0x7F;
+  byte goal_vel_upper_7 = (pulse_width & 0x3F80) >> 7;
+  LA_CNTRL_SERIAL.write(goal_vel_lower_7);
+  LA_CNTRL_SERIAL.write(goal_vel_upper_7);
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///*********************************** End servo functions ****************************************************/
@@ -267,8 +278,28 @@ void Init_End_Servo() {
   end_move_dir = 1;
   end_is_moving = false;
 }
+
 void End_Servo_Move_Callback() {
-  
+  static int new_position = END_ZERO_POSITION_PULSE_WIDTH;
+  end_curr_position = new_position;
+  if (abs(end_curr_position - end_goal_position) <= END_WIDTH_INCREMENT) {
+    // Close enough to reach goal position in one step
+    End_joint.writeMicroseconds(end_goal_position);
+    end_curr_position = end_goal_position;
+    end_is_moving = false;
+  }
+  else {
+    new_position = end_curr_position + (end_move_dir * END_WIDTH_INCREMENT);
+    if (End_Is_Valid_Position(new_position)) {
+      End_joint.writeMicroseconds(new_position);
+    }
+    else { // Reached end of range
+      end_is_moving = false;
+    }
+  }
+}
+/*
+void End_Servo_Move_Callback() {
   // The end servo position needs to be updated as the end servo arrives at the position that was calculated 
     // in the previous iteration. When this function is first called, the end servo will be arriving at the position which
     // was assigned to new_position at the end of the previous iteration, and the current position is updated to reflect this
@@ -285,11 +316,12 @@ void End_Servo_Move_Callback() {
     if (new_position >= END_MIN_PULSE_WIDTH && new_position <= END_MAX_PULSE_WIDTH) {
       End_joint.write(new_position);
     }
-    else {
+    else { // Reached end of range
       end_is_moving = false;
     }
   }
 }
+*/
 void Prepare_End_Servo_Move_Task(int goal_position) {
  
  // check for 800 < goal < 2300
@@ -314,6 +346,13 @@ bool End_Is_Valid_Position(int position) {
 ///*********************************** High-level arm motion functions *****************************************/
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void Prepare_Arm_Motion(Arm_Move_Command cmd) {
+  if (!(cmd.joints_to_move[0] || cmd.joints_to_move[1] || cmd.joints_to_move[2])) {
+    // This is the signal to toggle the electromagnet
+    solenoid_state = !solenoid_state;
+    //digitalWrite(SOLENOIDPIN, solenoid_state); // 100% duty cycle
+    analogWrite(SOLENOIDPIN, 204); // 80% duty cycle
+    return;
+  }
   if (cmd.joints_to_move[0]) {
     Prepare_Base_Servo_Move_Task(cmd.base_cmd);
   }
@@ -364,6 +403,8 @@ void Queue_Pick_Up_Block(float block_x, float block_z) {
  float base_grab_pos = Base_Rad_to_PWM(theta1);
  float LA_grab_pos = theta2 * 100;
  float end_grab_pos = End_Rad_to_PWM(theta3);
+ // Engage the electromagnet
+ Queue_EM_Toggle();
  //Arm_Move_Command Move_2 = {ALL_JOINTS, base_grab_pos, {LA_grab_pos, BLOCK_PLACE_MODE, 0}, end_grab_pos};
  Arm_Move_Command Move_2 = {ALL_JOINTS, base_grab_pos, {LA_grab_pos, DEFAULT_MODE, 8}, end_grab_pos};
  Arm_Move_Queue.enqueue(Move_2);
@@ -371,6 +412,11 @@ void Queue_Pick_Up_Block(float block_x, float block_z) {
  //Arm_Move_Command Move_3 = {ALL_JOINTS, base_start_pos, {LA_start_pos, BLOCK_PLACE_MODE, 0}, end_start_pos};  
  Arm_Move_Command Move_3 = {ALL_JOINTS, base_start_pos, {LA_start_pos, DEFAULT_MODE, 8}, end_start_pos};  
  Arm_Move_Queue.enqueue(Move_3);
+}
+
+void Queue_EM_Toggle() {
+  Arm_Move_Command Move_1 = {EM_TOGGLE, 0, {0, DEFAULT_MODE, LA_DEFAULT_VEL}, 0};
+  Arm_Move_Queue.enqueue(Move_1);
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*********************************** Test functions **********************************************************/

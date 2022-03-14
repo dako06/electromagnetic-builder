@@ -13,9 +13,11 @@
 #include "RPR_base_servo.h"
 #include "RPR_linear_actuator.h"
 #include "RPR_end_servo.h"
+#include "electromagnet_driver.hpp"
 
 /* Things to make defining Arm_Move_Command structs easier */
 // Adds in the appropriate boolean array to specify which joints to move
+#define EM_TOGGLE {0,0,0}
 #define BASE_ONLY {1,0,0}
 #define LA_ONLY {0,1,0}
 #define END_ONLY {0,0,1}
@@ -51,6 +53,7 @@ void Queue_Return_To_Home();
 void Queue_LA_Homing();
 void Queue_Pick_Up_Block(float block_x, float block_z);
 void Queue_Simple_Move_To_Position(float goal_x, float goal_z);
+void Queue_EM_Toggle();
 /****** Test functions ******/
 void Test_Base();
 void Test_LA();

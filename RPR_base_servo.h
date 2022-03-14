@@ -11,8 +11,7 @@ Servo Base_joint;
 // Parameters for setting the velocity of the base servo
   // Current setting: 2.86 degrees per second
 #define BASE_WIDTH_INCREMENT 5
-#define BASE_DELAY_US 90000 // Delay between setting new goal positions; this is already implemented by the main loop
-//#define BASE_DEFAULT_VEL 0.218 // Converted to radians
+#define BASE_DELAY_US 90000 // Delay between setting new goal positions; this is already implemented by the software timer
 #define BASE_DEFAULT_VEL 0.05 // Converted to radians
 int base_curr_position;
 int base_goal_position;

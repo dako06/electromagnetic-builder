@@ -54,6 +54,13 @@ void setup()
   Init_Base_Servo();
 //  Init_Linear_Actuator();
   Init_End_Servo();
+
+  initializeSolenoid();
+
+  Queue_LA_Homing();
+  Queue_Pick_Up_Block(float block_x, float block_z);
+  Queue_Return_To_Home();
+  Queue_EM_Toggle();
   
   prev_update_time = millis();
   pinMode(LED_WORKING_CHECK, OUTPUT);
