@@ -21,7 +21,7 @@ class GUI:
 
         # subscribe to active state of build process 
         self.gui_state_sub  = rospy.Subscriber("gui_state", GUI_State, self.gui_state_callback)
-        self.gui_state      = GUI_State(state="block_detection",target_acquired=False)
+        self.gui_state      = GUI_State(state="track_target_block",target_acquired=False)
 
         # cv bridge for converting raw ROS image
         self.cv_bridge  = CvBridge()
@@ -69,12 +69,15 @@ class GUI:
             block_list                    = self.img_pro.detectBlocks(src_img=cv_image)
             sorted_blocks, target_specs   = self.img_pro.getBlockTarget(block_list)
 
+            disp_img    = self.drawDetectionWindow(cv_image)
+
             if not self.target_set and len(sorted_blocks) != 0:
 
                 # set target block to allow for correspondence each image 
                 self.target_block.updateBlock(sorted_blocks[0])
                 self.target_set = True
                 self.direction  = target_specs.get('direction')
+                disp_img = cv_image
         
             elif self.target_set and len(sorted_blocks) != 0:
 
@@ -88,10 +91,13 @@ class GUI:
                 
                     self.target_block.updateBlock(corresp_block)
 
+                else: 
+                    disp_img = self.markTargetBlock(cv_image, self.target_block, (0,0,255))
+
+
             else:
                 disp_img = self.markTargetBlock(cv_image, self.target_block, (0,0,255))
             
-            # disp_img    = self.drawDetectionWindow(disp_img)
                         
         elif state == "track_block_transport":
             is_detected, pixel_features = self.img_pro.trackBlockTransport(cv_image)

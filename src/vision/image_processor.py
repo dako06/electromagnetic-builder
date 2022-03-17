@@ -3,11 +3,11 @@
 import cv2 as cv
 import numpy as np
 
-from vision.building_block import Block 
-from vision.pixel_grid import PixelGrid
+# from vision.building_block import Block 
+# from vision.pixel_grid import PixelGrid
 
-# from building_block import Block 
-# from pixel_grid import PixelGrid
+from building_block import Block 
+from pixel_grid import PixelGrid
 
 class ImageProcessor:
 

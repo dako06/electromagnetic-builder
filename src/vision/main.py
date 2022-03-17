@@ -42,6 +42,25 @@ TEST = 4
 
 # img_dilation = img_pro.applyDilation(kernal_size=2, src=img_erosion, shape="rectangle")
 
+if TEST == -1:
+
+    image_name  = "./block_scheme/5.png"         
+    img_bgr     = cv.imread(image_name)  
+    img         = img_bgr.copy() 
+
+    if img_bgr is None:
+        sys.exit("Could not read the image.") # exit if issue opening image
+
+       # HSV color filters with lower and upper thresholds  
+    # filter_HSV  = {'lower':np.array([40, 110, 20], dtype = "uint8"), 'upper':np.array([70, 255, 255],  dtype = "uint8")}
+
+    mask = img_pro.filterColor(img, img_pro.block_filter_HSV)
+    comp = img_pro.getConnectedComponents(mask, connectivity=8)
+    img_pro.viewComponents(img, comp, [], verbose=True)
+
+
+    img_pro.displayImg('Original Image', img, 'img')    
+    img_pro.displayImg('Mask', mask, 'mask.png')    
 
 
 if TEST == 0:
@@ -167,6 +186,9 @@ if TEST == 4:
     time_cost = []
 
     view_filtered = True
+    
+    total_blocks = 0
+
 
     # iterate over reach distance 
     for i in range(0, index):
@@ -191,24 +213,49 @@ if TEST == 4:
             # img_pro.displayImg(main_window, img, 'img')      
        
 
-            # # apply color filter  
-            # block_mask = img_pro.filterColor(img_copy_1, img_pro.block_filter_HSV)               
-            # img_pro.displayImg("raw blue mask", block_mask, 'img')    
 
+            """ process pink filtered blobs """
+            # lower_mask  = img_pro.filterColor(img, img_pro.block_filter_HSV)
+            # # img_pro.displayImg(main_window, lower_mask, 'img')    
+
+            # upper_mask  = img_pro.filterColor(img, img_pro.emag_filter_HSV)
+            # # img_pro.displayImg(main_window, upper_mask, 'img')    
             
-            # """ process blue filtered blobs """
+            # open_param = {'erosion':4, 'dilation':2}
+            # metal_thresh = {'width':(20,50), 'height':(10,50), 'area':(200,2000)}
 
-            # # open blue mask
+            # opened_emag = img_pro.compoundOpenImage(upper_mask, open_param)
+            # img_pro.displayImg(main_window, opened_emag, 'img')    
+            # emag_comps  = img_pro.getConnectedComponents(opened_emag, connectivity=8) 
+
+            # conn_open_param = {'erosion':4, 'dilation':2}
+            # connection_mask = lower_mask + upper_mask 
+            # opened_conn = img_pro.compoundOpenImage(connection_mask, conn_open_param)
+            # img_pro.displayImg(main_window, opened_conn, 'img')    
+            # conn_comps  = img_pro.getConnectedComponents(opened_conn, connectivity=8) 
+            # img_pro.viewComponents(img, conn_comps, [], verbose=True)
+            # img_pro.displayImg(main_window, connection_mask, 'img')    
+
+
+
+            # to = time.time() 
+            
+            """ process blue filtered blobs """
+            # apply color filter  
+            # block_mask = img_pro.filterColor(img, img_pro.block_filter_HSV)               
+            # # img_pro.displayImg("raw blue mask", block_mask, 'img')    
+
+            # open blue mask
             # opened_blue = img_pro.compoundOpenImage(block_mask, img_pro.block_open_param)
             # # img_pro.displayImg("opened blue mask", opened_blue, 'img')      
 
             # blue_comps = img_pro.getConnectedComponents(opened_blue, connectivity=8)  
             # blue_inliers = img_pro.filterComponents(blue_comps, img_pro.block_thresh)
             # # print("number of blue inlier indices found: ", len(blue_inliers))            
-            # # img_pro.viewComponents(img_copy_4, blue_comps, blue_inliers, verbose=True)
+            # # img_pro.viewComponents(img, blue_comps, blue_inliers, verbose=True)
 
-            # """ process inverse """
-            # # img_pro.displayImg("opened inverse", opened_inverse, 'img')      
+            """ process inverse """
+            # # # img_pro.displayImg("opened inverse", opened_inverse, 'img')      
             # inverse         = cv.bitwise_not(block_mask)
             # opened_inverse  = img_pro.compoundOpenImage(inverse, img_pro.metal_open_param)  
 
@@ -217,75 +264,65 @@ if TEST == 4:
             # # print("number of metal inlier indices found: ", len(metal_inliers))            
             # # img_pro.viewComponents(img_copy_2, metal_comps, metal_inliers, verbose=True)
 
-            to = time.time() 
+
+
+
+
+
+            """ detect blocks """
+            # to = time.time() 
             block_list = img_pro.detectBlocks(src_img=img)
-            sorted_blocks, obj_position = img_pro.getBlockTarget(block_list=block_list) 
-            tf = time.time()
-            print('%d labels took %f s to process' % (len(block_list), (tf-to)))
+            # # sorted_blocks, obj_position = img_pro.getBlockTarget(block_list=block_list) 
+            # tf = time.time()
 
-            labeled_img = img_pro.labelBlocks(src_img=img, block_list=block_list)
-            window_img  = img_pro.drawDetectionWindow(src_img=labeled_img)            
+            # time_cost.append((tf-to))
+            # print('%d labels took %f s to process' % (len(block_list), (tf-to)))
 
-            if obj_position != "unknown" and len(block_list) != 0:
-
-                cx, cy = sorted_blocks[0].centroid
-                xf, yf = img_pro.pix_grid.window_anchor
-            
-                cv.arrowedLine(window_img, (xf,yf), (int(cx), int(cy)), (0,255,0), 1)
-                img_pro.displayImg(main_window, window_img, 'img')
-
-            else:  
-                print("nearest block not found")
-                img_pro.displayImg(main_window, window_img, 'img')
-
-
+            # labeled_img = img_pro.labelBlocks(src_img=img, block_list=block_list)
+            # window_img  = img_pro.drawDetectionWindow(src_img=labeled_img)     
+             
             if len(block_list) != 0:
-                
-                # test_block = Block(width==)
-                # w block_list[0].pixel_dim.get('width')
-                # test_block.pixel_o = test_block.pixel_o[0] + 50, test_block.pixel_o[1] + 50
-                # test_block.centroid = test_block.centroid[0] + 50, test_block.centroid[1] + 50
-                # test_block.updateFeatureArray()
 
-                # c_block = img_pro.getBlockCorrespondence(block_list, test_block, -1)
+                total_blocks += len(block_list)
 
-                print("correspondence block:" )
-                print("x,y: %f, %f" % c_block.pixel_o)
-                print("centroid: %f, %f" % c_block.centroid)
+                for b in block_list:
 
-                print("target block:" )
-                print("x,y: %f, %f" % test_block.pixel_o)
-                print("centroid: %f, %f" % test_block.centroid)
+                    cx, cy = b.centroid
+                    
+                    x,y     = b.pixel_o
+                    w, h    = b.pixel_dim.get('width'), b.pixel_dim.get('height') 
+                    a       = b.pixel_dim.get('area')
+                    
+                    sample = np.array([distance[i], x, y, cx, cy, w, h, a])
+                    data = np.concatenate((data, sample.reshape(sample_shape)),axis=0)
 
+          
 
-
-
-            # # filtered_list = inverse_filtered
-            # filtered_list = filtered_blue
+            # filtered_list = inverse_filtered
+            # filtered_list = metal_inliers
 
             # # comps = inverse_comps
-            # comps = comps_blue
+            # comps = metal_comps
 
-            # """ show filtered or non-filtered results """
-            # if view_filtered:
+            """ show filtered or non-filtered results """
+            # if view_filtered and len(metal_inliers)!=0:
 
+            #     (label_count, label_matrix, stats, centroids) = comps
             #     print("number of filtered elements: ", len(filtered_list))
-            #     for c in filtered_list:
+            #     for ix in filtered_list:
 
-            #         (x,y)       = c.get('xy')
-            #         (w,h)       = c.get('wh')
-            #         (cX, cY)    = c.get('centroid')
-            #         ix          = c.get('label_id')
-            #         area        = c.get('area')
-
-            #         # component_mask = (label_matrix == ix).astype("uint8") * 255
-
-            #         sample = np.array([distance[i], x, y, cX, cY, w, h, area])
+            #         cX, cY  = centroids[ix]
+            #         sample = np.array([distance[i], stats[ix, cv.CC_STAT_LEFT], stats[ix, cv.CC_STAT_TOP], \
+            #                     cX, cY, stats[ix, cv.CC_STAT_WIDTH], stats[ix, cv.CC_STAT_HEIGHT], stats[ix, cv.CC_STAT_AREA]])
             #         data = np.concatenate((data, sample.reshape(sample_shape)),axis=0)
+
+
+                    # sample = np.array([distance[i], x, y, cX, cY, w, h, area])
+                    # data = np.concatenate((data, sample.reshape(sample_shape)),axis=0)
 
             
             # else:
-
+            
             #     # unpack un-filtered components 
             #     (label_count, label_matrix, stats, centroids) = comps
 
@@ -296,138 +333,152 @@ if TEST == 4:
             #         sample = np.array([distance[i], stats[k, cv.CC_STAT_LEFT], stats[k, cv.CC_STAT_TOP], \
             #           cX, cY, stats[k, cv.CC_STAT_WIDTH], stats[k, cv.CC_STAT_HEIGHT], stats[k, cv.CC_STAT_AREA]])
             #         data = np.concatenate((data, sample.reshape(sample_shape)),axis=0)
+            
+            # unfiltered components 
+            # comp = metal_comps
+            # # comp = blue_comps
 
-
-
+            # (label_count, label_matrix, stats, centroids) = comp
+            # # ignore back ground
+            # for k in range(1, label_count):
+            #     cX, cY  = centroids[k]
+            #     sample = np.array([distance[i], stats[k, cv.CC_STAT_LEFT], stats[k, cv.CC_STAT_TOP], \
+            #       cX, cY, stats[k, cv.CC_STAT_WIDTH], stats[k, cv.CC_STAT_HEIGHT], stats[k, cv.CC_STAT_AREA]])
+            #     data = np.concatenate((data, sample.reshape(sample_shape)),axis=0)
 
             # time_cost.append(tf-to)
-
     
-    # df = pd.DataFrame(data=data[1:,:], columns=columns)
+    # # """ plot time cost """
+    # fig, ax = plt.subplots()
+    # t_ix = np.arange(0, len(time_cost), 1)
+    # ax.scatter(t_ix, time_cost)
+    # ax.set(xlabel='image index', ylabel='time[s]',title='Time Cost')
+
+    # plt.show()
+
+    print("total number of blocks: ", total_blocks)
     
-    # """ plot results """
+    df = pd.DataFrame(data=data[1:,:], columns=columns)
+    
+    """ plot results """
 
-    # y = df['y'].values
-    # x = df['x'].values
-    # d = df['distance'].values
-    # w = df['width'].values
-    # h = df['height'].values
-    # area = df['area'].values
-    # cy = df['cent_y'].values
-    # cx = df['cent_x'].values
+    y = df['y'].values
+    x = df['x'].values
+    d = df['distance'].values
+    w = df['width'].values
+    h = df['height'].values
+    area = df['area'].values
+    cy = df['cent_y'].values
+    cx = df['cent_x'].values
 
-    # b = 30
-    # index = len(y)
+    b = 30
+    index = len(y)
 
-    # print("Total number of labels resulting from connected component analysis: %d" % index)
+    print("Total number of labels resulting from connected component analysis: %d" % index)
 
-    # """ estimated features """
+    """ estimated features """
 
-    # median_width    = median(w)
-    # mean_width      = np.mean(w)
-    # median_height   = median(h)
-    # mean_height     = np.mean(h)
+    median_width    = median(w)
+    mean_width      = np.mean(w)
+    median_height   = median(h)
+    mean_height     = np.mean(h)
 
-    # res_med_width   = w - median_width
-    # res_mean_width  = w - mean_width
-    # res_med_height  = h - median_height
-    # res_mean_height = h - mean_height
+    res_med_width   = w - median_width
+    res_mean_width  = w - mean_width
+    res_med_height  = h - median_height
+    res_mean_height = h - mean_height
 
-    # stretch = w/h
-    # strain = h/w
+    stretch = w/h
+    strain = h/w
   
 
 
-    # """ plot time cost """
-    # # figt, axt = plt.subplots()
-    # # t_ix = np.arange(0, len(time_cost), 1)
-    # # axt.plot(t_ix, time_cost)
-    # # axt.set_title('Time Cost vs distance')
 
-    # """ feature analysis in pixel area """
-    # fig, ax = plt.subplots(2,2)
 
-    # ax[0, 0].hist(stretch, bins=100)
-    # ax[0, 0].set_title('w/h ratio')
-    # ax[0, 0].grid()
+    """ feature analysis in pixel area """
+    fig, ax = plt.subplots(2,2)
 
-    # ax[0, 1].scatter(stretch, np.negative(cy), color='red', s=5)
-    # ax[0, 1].set(xlabel='w/h ratio', ylabel='row index',title='centroid-y vs. w/h ratio')
-    # ax[0, 1].grid()
+    ax[0, 0].hist(stretch, bins=100)
+    ax[0, 0].set_title('w/h ratio')
+    ax[0, 0].grid()
 
-    # ax[1, 0].hist(strain, bins=75)
-    # ax[1, 0].set_title('h/w ratio')
-    # ax[1, 0].grid()
+    ax[0, 1].scatter(stretch, np.negative(cy), color='red', s=5)
+    ax[0, 1].set(xlabel='w/h ratio', ylabel='row index',title='centroid-y vs. w/h ratio')
+    ax[0, 1].grid()
 
-    # ax[1, 1].scatter(d, stretch, color='red', s=5, label='w/h')
-    # ax[1, 1].scatter(d, strain, color='blue', s=5, label='h/w')
-    # ax[1, 1].set(xlabel='[m]', ylabel='ratio',title='ratio vs. distance')    
-    # ax[1, 1].grid()
-    # ax[1, 1].legend()
+    ax[1, 0].hist(strain, bins=75)
+    ax[1, 0].set_title('h/w ratio')
+    ax[1, 0].grid()
 
-    # plt.show()
+    ax[1, 1].scatter(d, stretch, color='red', s=5, label='w/h')
+    ax[1, 1].scatter(d, strain, color='blue', s=5, label='h/w')
+    ax[1, 1].set(xlabel='[m]', ylabel='ratio',title='ratio vs. distance')    
+    ax[1, 1].grid()
+    ax[1, 1].legend()
+
+    plt.show()
 
 
 
-    # # """ analysis of pixel area """
-    # fig, ax = plt.subplots(1,3)
+    # """ analysis of pixel area """
+    fig, ax = plt.subplots(1,3)
     
-    # ax[0].hist(area, bins=50)
-    # ax[0].set_title('pixel area distribution')
+    ax[0].hist(area, bins=50)
+    ax[0].set_title('pixel area distribution')
 
 
-    # ax[1].scatter(area, np.negative(y), color='red', s=5)
-    # ax[1].set_title('row vs. pixel area')
+    ax[1].scatter(area, np.negative(y), color='red', s=5)
+    ax[1].set_title('row vs. pixel area')
  
-    # ax[2].scatter(d, area, color='red', s=5)
-    # ax[2].set_title('area vs. distance [m]')
+    ax[2].scatter(d, area, color='red', s=5)
+    ax[2].set_title('area vs. distance [m]')
 
-    # plt.show()
+    plt.show()
 
 
-    # # """ analysis of pixel width """
-    # fig1, ax1 = plt.subplots(2,2)
+    # """ analysis of pixel width """
+    fig1, ax1 = plt.subplots(2,2)
     
-    # ax1[0, 0].hist(w, bins=100)
-    # ax1[0, 0].set_title('pixel width distribution')
+    ax1[0, 0].hist(w, bins=100)
+    ax1[0, 0].set_title('pixel width distribution')
 
-    # ax1[0, 1].scatter(w, np.negative(cy), color='red', s=5)
-    # ax1[0, 1].set_title('row centroid vs. pixel width')
+    ax1[0, 1].scatter(w, np.negative(cy), color='red', s=5)
+    ax1[0, 1].set_title('row centroid vs. pixel width')
 
-    # ax1[1, 0].scatter(cx, w, color='red', s=5)
-    # ax1[1, 0].set_title('pixel width vs. column centroid')
+    ax1[1, 0].scatter(cx, w, color='red', s=5)
+    ax1[1, 0].set_title('pixel width vs. column centroid')
 
-    # ax1[1, 1].scatter(d, w, color='red', s=5)
-    # ax1[1, 1].set_title('pixel width vs. distance [m]')
+    ax1[1, 1].scatter(d, w, color='red', s=5)
+    ax1[1, 1].set_title('pixel width vs. distance [m]')
 
-    # plt.show()
-
-
-    # fig, ax = plt.subplots()
-    # ax.scatter(w, h, color='blue', s=5)
-    # ax.scatter(median_width, median_height, color='green', s=5, label='median')
-    # ax.scatter(mean_width, mean_height, color='red', s=5, label='mean')
-    # ax.set(xlabel='width', ylabel='height',title='pixel height vs. pixel width') 
-    # ax.grid() 
-    # ax.legend()
-    # plt.show()
+    plt.show()
 
 
+    fig, ax = plt.subplots()
+    ax.scatter(w, h, color='blue', s=5)
+    ax.scatter(median_width, median_height, color='green', s=5, label='median')
+    ax.scatter(mean_width, mean_height, color='red', s=5, label='mean')
+    ax.set(xlabel='width', ylabel='height',title='pixel height vs. pixel width') 
+    ax.grid() 
+    ax.legend()
+    plt.show()
 
-    # # """ analysis of pixel height """
-    # fig2, ax2 = plt.subplots(1,3)
+
+
+    # """ analysis of pixel height """
+    fig2, ax2 = plt.subplots(1,3)
     
-    # ax2[0].hist(h, bins=100)
-    # ax2[0].set_title('pixel height distribution')
+    ax2[0].hist(h, bins=100)
+    ax2[0].set_title('pixel height distribution')
 
-    # ax2[1].scatter(h, np.negative(cy), color='red', s=5)
-    # ax2[1].set(xlabel='height', ylabel='row centroid',title='row centroid vs. pixel height')
-    # ax2[1].grid()    
+    ax2[1].scatter(h, np.negative(cy), color='red', s=5)
+    ax2[1].set(xlabel='height', ylabel='row centroid',title='row centroid vs. pixel height')
+    ax2[1].grid()    
 
-    # ax2[2].scatter(d, h, color='red', s=5)
-    # ax2[2].set(xlabel='[m]', ylabel='height',title='pixel height vs. distance ')    
-    # ax2[2].grid()    
-    # plt.show()
+    ax2[2].scatter(d, h, color='red', s=5)
+    ax2[2].set(xlabel='[m]', ylabel='height',title='pixel height vs. distance ')    
+    ax2[2].grid()    
+    plt.show()
 
 
 
