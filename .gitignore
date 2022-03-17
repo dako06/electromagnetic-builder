@@ -1,6 +1,6 @@
 *.pyc
 .vscode/
 __pycache__/
-*.png
+
 *.jpg
 build/
